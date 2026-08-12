@@ -311,6 +311,7 @@ dependencies {
     implementation(libs.kotlinx.collections.immutable)
     implementation(libs.ktor.server.core)
     implementation(libs.ktor.server.cio)
+    implementation(libs.ktor.client.core)
 
     // Identity & Background
     implementation(libs.androidx.work.runtime.ktx)
