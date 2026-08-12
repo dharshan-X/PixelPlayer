@@ -104,6 +104,9 @@ benchmarkMacroJunit4 = "1.4.1"
 baselineprofile = "1.5.0-alpha06"
 profileinstaller = "1.4.1"
 pagingCommon = "3.3.6"
+rhino = "1.9.1"
+brotli = "0.1.2"
+re2j = "1.8"
 
 # Wear OS
 horologist = "0.7.15"
@@ -272,6 +275,9 @@ commons-lang3 = { module = "org.apache.commons:commons-lang3", version.ref = "co
 jdom2 = { module = "org.jdom:jdom2", version.ref = "jdom2" }
 jose4j = { module = "org.bitbucket.b_c:jose4j", version.ref = "jose4j" }
 apache-httpclient = { module = "org.apache.httpcomponents:httpclient", version.ref = "httpclient" }
+rhino = { module = "org.mozilla:rhino", version.ref = "rhino" }
+brotli = { module = "org.brotli:dec", version.ref = "brotli" }
+re2j = { module = "com.google.re2j:re2j", version.ref = "re2j" }
 
 
 [plugins]
