@@ -125,4 +125,23 @@
     <string name="common_play_album">Play album</string>
     <string name="common_shuffle_play_album">Shuffle play album</string>
     <string name="common_album_art_for_title">Album art for %1$s</string>
+
+    <!-- ArchiveTune / Online Music -->
+    <string name="archivetune_explore_title">Online Music</string>
+    <string name="archivetune_explore_subtitle">Stream millions of songs &amp; charts</string>
+    <string name="archivetune_search_hint">Search songs, albums, artists...</string>
+    <string name="archivetune_trending">Trending Now</string>
+    <string name="archivetune_quick_picks">Quick Picks</string>
+    <string name="archivetune_charts">Top Charts</string>
+    <string name="archivetune_moods_genres">Moods &amp; Genres</string>
+    <string name="archivetune_filter_all">All</string>
+    <string name="archivetune_filter_songs">Songs</string>
+    <string name="archivetune_filter_albums">Albums</string>
+    <string name="archivetune_filter_artists">Artists</string>
+    <string name="archivetune_filter_playlists">Playlists</string>
+    <string name="archivetune_provider_name">YouTube Music</string>
+    <string name="archivetune_provider_subtitle">Stream online with ArchiveTune</string>
+    <string name="archivetune_resolving_stream">Loading stream...</string>
+    <string name="archivetune_error_loading">Failed to load online feed</string>
+    <string name="archivetune_error_stream">Unable to play this track</string>
 </resources>

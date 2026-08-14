@@ -41,6 +41,7 @@ import com.theveloper.pixelplay.ui.theme.GoogleSansRounded
 @Composable
 fun StreamingProviderSheet(
     onDismissRequest: () -> Unit,
+    onNavigateToArchiveTuneExplore: () -> Unit = {},
     isNeteaseLoggedIn: Boolean = false,
     onNavigateToNeteaseDashboard: () -> Unit = {},
     isQqMusicLoggedIn: Boolean = false,
@@ -104,6 +105,18 @@ fun StreamingProviderSheet(
                         .clip(providerSegmentContainerShape),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
+                    ProviderRow(
+                        iconPainter = painterResource(R.drawable.ic_youtube_music),
+                        iconTint = Color(0xFFFF0000),
+                        title = stringResource(R.string.archivetune_provider_name),
+                        subtitle = stringResource(R.string.archivetune_provider_subtitle),
+                        shape = providerSegmentItemShape,
+                        isConnected = true,
+                        onClick = {
+                            onNavigateToArchiveTuneExplore()
+                            onDismissRequest()
+                        }
+                    )
                     ProviderRow(
                         iconPainter = painterResource(R.drawable.telegram),
                         iconTint = Color(0xFF2AABEE),

@@ -504,6 +504,16 @@ fun AppNavigation(
                     )
                 }
             }
+            composable(
+                Screen.ArchiveTuneExplore.route,
+            ) {
+                ScreenWrapper(navController = navController, playerViewModel = playerViewModel, animatedVisibilityScope = this) {
+                    com.theveloper.pixelplay.presentation.archivetune.ArchiveTuneExploreScreen(
+                        onBack = { navController.popBackStack() },
+                        playerViewModel = playerViewModel
+                    )
+                }
+            }
         }
     }
 }

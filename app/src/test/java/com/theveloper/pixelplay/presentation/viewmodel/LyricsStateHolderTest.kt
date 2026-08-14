@@ -55,7 +55,8 @@ class LyricsStateHolderTest {
             userPreferencesRepository = userPreferencesRepository,
             songMetadataEditor = songMetadataEditor
         )
-        val scope = TestScope(StandardTestDispatcher())
+        val testDispatcher = StandardTestDispatcher()
+        val scope = TestScope(testDispatcher)
         val callback = RecordingLyricsLoadCallback()
         val state = MutableStateFlow(StablePlayerState())
         val song = testSong(albumArtUriString = "content://art/song_art_1.jpg").copy(
@@ -71,7 +72,13 @@ class LyricsStateHolderTest {
             forcePickResults = false,
             sourcePreference = com.theveloper.pixelplay.data.model.LyricsSourcePreference.API_FIRST
         ) { "Lyrics already available" }
-        scope.advanceUntilIdle()
+
+        var attempts = 0
+        while (holder.searchUiState.value !is LyricsSearchUiState.Success && attempts < 100) {
+            testDispatcher.scheduler.advanceUntilIdle()
+            Thread.sleep(20)
+            attempts++
+        }
 
         assertThat(holder.searchUiState.value).isEqualTo(LyricsSearchUiState.Success(storedLyrics))
         coVerify(exactly = 1) { musicRepository.getStoredLyrics(song) }
