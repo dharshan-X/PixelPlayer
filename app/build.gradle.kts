@@ -369,6 +369,7 @@ dependencies {
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.androidx.junit)
     testImplementation(libs.androidx.room.testing)
+    testImplementation(libs.mockwebserver)
     testImplementation(kotlin("test"))
 
     // Testing (Instrumentation)
