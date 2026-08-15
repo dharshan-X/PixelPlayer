@@ -1,5 +1,9 @@
 package com.theveloper.pixelplay.presentation.components
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -19,6 +23,8 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.rounded.Cloud
+import androidx.compose.material.icons.rounded.PhoneAndroid
+import com.theveloper.pixelplay.data.model.StorageFilter
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LargeTopAppBar
@@ -94,7 +100,6 @@ fun GenreGradientTopBar(
     )
 }
 
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeGradientTopBar(
@@ -104,6 +109,8 @@ fun HomeGradientTopBar(
     onTelegramClick: () -> Unit,
     onMenuClick: () -> Unit = {},
     isScrolled: Boolean = false,
+    currentStorageFilter: StorageFilter = StorageFilter.ALL,
+    onToggleStorageFilter: ((StorageFilter) -> Unit)? = null,
 ) {
     val surfaceContainerHigh = MaterialTheme.colorScheme.surfaceContainerHighest
 
@@ -148,6 +155,47 @@ fun HomeGradientTopBar(
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold
                         )
+                    }
+                }
+
+                if (onToggleStorageFilter != null) {
+                    val isOffline = currentStorageFilter == StorageFilter.OFFLINE
+                    FilledTonalButton(
+                        shape = CircleShape,
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = if (isOffline) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = if (isOffline) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onPrimaryContainer
+                        ),
+                        onClick = {
+                            val next = if (isOffline) StorageFilter.ALL else StorageFilter.OFFLINE
+                            onToggleStorageFilter(next)
+                        }
+                    ) {
+                        AnimatedContent(
+                            targetState = isOffline,
+                            transitionSpec = {
+                                fadeIn(animationSpec = tween(200)) togetherWith fadeOut(animationSpec = tween(200))
+                            },
+                            label = "home_storage_filter_mode"
+                        ) { offline ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (offline) Icons.Rounded.PhoneAndroid else Icons.Rounded.Cloud,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    text = stringResource(if (offline) R.string.home_mode_offline else R.string.home_mode_all),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontFamily = GoogleSansRounded,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
                     }
                 }
             }

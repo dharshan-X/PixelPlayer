@@ -144,4 +144,6 @@
     <string name="archivetune_resolving_stream">Loading stream...</string>
     <string name="archivetune_error_loading">Failed to load online feed</string>
     <string name="archivetune_error_stream">Unable to play this track</string>
+    <string name="home_mode_all">Online</string>
+    <string name="home_mode_offline">Device Only</string>
 </resources>

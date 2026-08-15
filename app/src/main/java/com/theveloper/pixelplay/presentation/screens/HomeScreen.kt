@@ -83,6 +83,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.theveloper.pixelplay.R
 import com.theveloper.pixelplay.data.model.Song
+import com.theveloper.pixelplay.data.model.StorageFilter
 import com.theveloper.pixelplay.data.preferences.CollagePattern
 import com.theveloper.pixelplay.presentation.components.AlbumArtCollage
 import com.theveloper.pixelplay.presentation.components.BetaInfoBottomSheet
@@ -119,6 +120,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import racra.compose.smooth_corner_rect_library.AbsoluteSmoothCornerShape
 import androidx.compose.ui.res.stringResource
+import com.theveloper.pixelplay.presentation.archivetune.ArchiveTuneExploreViewModel
+import com.theveloper.pixelplay.presentation.components.HomeOnlineQuickPicksSection
 
 private const val HomeLoadingPlaceholderMinDurationMillis = 1200L
 
@@ -131,6 +134,7 @@ fun HomeScreen(
     paddingValuesParent: PaddingValues,
     playerViewModel: PlayerViewModel = hiltViewModel(),
     settingsViewModel: SettingsViewModel = hiltViewModel(),
+    archiveTuneViewModel: ArchiveTuneExploreViewModel = hiltViewModel(),
     neteaseViewModel: NeteaseDashboardViewModel = hiltViewModel(),
     qqMusicViewModel: QqMusicDashboardViewModel = hiltViewModel(),
     navidromeViewModel: NavidromeDashboardViewModel = hiltViewModel(),
@@ -148,6 +152,8 @@ fun HomeScreen(
     val curatedYourMixSongs by playerViewModel.yourMixSongs.collectAsStateWithLifecycle()
     val homeMixPreviewSongs by playerViewModel.homeMixPreviewSongs.collectAsStateWithLifecycle()
     val playbackHistory by playerViewModel.playbackHistory.collectAsStateWithLifecycle()
+    val currentStorageFilter by playerViewModel.storageFilter.collectAsStateWithLifecycle()
+    val archiveTuneUiState by archiveTuneViewModel.uiState.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
 
     val usesFallbackHomeMix = remember(curatedYourMixSongs, dailyMixSongs) {
@@ -328,6 +334,10 @@ fun HomeScreen(
                     onMenuClick = {
                         // onOpenSidebar() // Disabled
                     },
+                    currentStorageFilter = currentStorageFilter,
+                    onToggleStorageFilter = { newFilter ->
+                        playerViewModel.setStorageFilter(newFilter)
+                    },
                     isScrolled = isScrolledPastThreshold.value
                 )
             }
@@ -416,6 +426,30 @@ fun HomeScreen(
                                 } else {
                                     playerViewModel.showAndPlaySong(song, yourMixSongs, "Your Mix")
                                 }
+                            }
+                        )
+                    }
+                }
+
+                // YouTube Music / ArchiveTune Online Quick Picks & Trending
+                if (currentStorageFilter != StorageFilter.OFFLINE) {
+                    item(
+                        key = "home_online_quick_picks",
+                        contentType = "home_online_quick_picks"
+                    ) {
+                        HomeOnlineQuickPicksSection(
+                            sections = archiveTuneUiState.homeSections,
+                            isLoading = archiveTuneUiState.isLoadingHome,
+                            resolvingSongId = archiveTuneUiState.isResolvingSongId,
+                            onSongClick = { songItem, contextList ->
+                                archiveTuneViewModel.playSongItem(
+                                    songItem = songItem,
+                                    contextSongs = contextList,
+                                    playerViewModel = playerViewModel
+                                )
+                            },
+                            onNavigateToExplore = {
+                                navController.navigateSafely(Screen.ArchiveTuneExplore.route)
                             }
                         )
                     }
