@@ -101,6 +101,15 @@ class PixelPlayApplication : Application(), ImageLoaderFactory, Configuration.Pr
             CrashHandler.install(this)
         }
 
+        moe.rukamori.archivetune.innertube.NetworkGatekeeper.setConnectionBlocked(false)
+        moe.rukamori.archivetune.morideobfuscator.MoriCipherRuntime.initialize(
+            moe.rukamori.archivetune.morideobfuscator.MoriCipherConfig(
+                cacheDirectory = java.io.File(noBackupFilesDir, "mori_cipher"),
+                proxyProvider = { moe.rukamori.archivetune.innertube.YouTube.streamProxy },
+            )
+        )
+        moe.rukamori.archivetune.utils.potoken.BotGuardTokenGenerator.initialize(this)
+
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
         } else {
@@ -129,6 +138,9 @@ class PixelPlayApplication : Application(), ImageLoaderFactory, Configuration.Pr
             if (savedLimit != null) {
                 AlbumArtCacheManager.configuredCacheLimitMb = savedLimit.toLong()
             }
+            runCatching {
+                moe.rukamori.archivetune.morideobfuscator.MoriCipherRuntime.refresh(force = false)
+            }.onFailure { Timber.w(it, "MoriCipherRuntime background refresh failed") }
         }
     }
 

@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.ConnectivityManager
 import moe.rukamori.archivetune.constants.AudioQuality
 import moe.rukamori.archivetune.constants.PlayerStreamClient
+import moe.rukamori.archivetune.moriextractor.BearerTokenRepository
 import moe.rukamori.archivetune.moriextractor.StreamingExtractionManager
 import moe.rukamori.archivetune.utils.StreamClientUtils
 import moe.rukamori.archivetune.utils.YTPlayerUtils
@@ -12,7 +13,8 @@ import javax.inject.Singleton
 
 @Singleton
 class ArchiveTuneStreamResolver @Inject constructor(
-    private val extractionManager: StreamingExtractionManager
+    private val extractionManager: StreamingExtractionManager,
+    private val tokenRepository: BearerTokenRepository
 ) {
     suspend fun resolveStream(
         context: Context,
@@ -63,19 +65,22 @@ class ArchiveTuneStreamResolver @Inject constructor(
         }
 
         if (mode == StreamBackendMode.AUTO_FALLBACK) {
-            val extracted = extractionManager.extractAudio(videoUrl = "https://www.youtube.com/watch?v=$videoId")
-            val requestProfile = StreamClientUtils.resolveRequestProfile(clientParam = "WEB_REMIX")
-            return@runCatching ArchiveTuneStreamResult(
-                videoId = videoId,
-                streamUrl = extracted.streamUrl,
-                mimeType = extracted.mimeType ?: "audio/webm",
-                bitrate = 160_000,
-                expiresInSeconds = (extracted.streamExpiresAt - System.currentTimeMillis() / 1000).toInt().coerceAtLeast(300),
-                clientName = "KOIVERSE_EXTRACTOR",
-                userAgent = requestProfile.userAgent,
-                origin = requestProfile.origin,
-                referer = requestProfile.referer
-            )
+            val token = tokenRepository.getToken()
+            if (!token.isNullOrBlank()) {
+                val extracted = extractionManager.extractAudio(videoUrl = "https://www.youtube.com/watch?v=$videoId")
+                val requestProfile = StreamClientUtils.resolveRequestProfile(clientParam = "WEB_REMIX")
+                return@runCatching ArchiveTuneStreamResult(
+                    videoId = videoId,
+                    streamUrl = extracted.streamUrl,
+                    mimeType = extracted.mimeType ?: "audio/webm",
+                    bitrate = 160_000,
+                    expiresInSeconds = (extracted.streamExpiresAt - System.currentTimeMillis() / 1000).toInt().coerceAtLeast(300),
+                    clientName = "KOIVERSE_EXTRACTOR",
+                    userAgent = requestProfile.userAgent,
+                    origin = requestProfile.origin,
+                    referer = requestProfile.referer
+                )
+            }
         }
 
         throw nativeResult.exceptionOrNull() ?: IllegalStateException("Failed to resolve stream for $videoId")
