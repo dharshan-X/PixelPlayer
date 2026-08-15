@@ -32,6 +32,14 @@ import com.theveloper.pixelplay.presentation.components.PlaylistMultiSelectionBo
 import com.theveloper.pixelplay.presentation.components.GenreMultiSelectionOptionSheet
 import com.theveloper.pixelplay.presentation.components.subcomps.SelectionActionRow
 import com.theveloper.pixelplay.presentation.components.subcomps.SelectionCountPill
+import com.theveloper.pixelplay.presentation.archivetune.ArchiveTuneExploreViewModel
+import com.theveloper.pixelplay.presentation.archivetune.ArchiveTuneSearchCategory
+import com.theveloper.pixelplay.data.model.StorageFilter
+import moe.rukamori.archivetune.innertube.models.SongItem as YTSongItem
+import moe.rukamori.archivetune.innertube.models.AlbumItem as YTAlbumItem
+import moe.rukamori.archivetune.innertube.models.ArtistItem as YTArtistItem
+import moe.rukamori.archivetune.innertube.models.PlaylistItem as YTPlaylistItem
+import moe.rukamori.archivetune.innertube.models.YTItem
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -52,16 +60,19 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.PhoneAndroid
+import com.theveloper.pixelplay.presentation.screens.search.components.OnlineSearchResults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -163,6 +174,7 @@ fun SearchScreen(
     paddingValues: PaddingValues,
     playerViewModel: PlayerViewModel = hiltViewModel(),
     playlistViewModel: PlaylistViewModel = hiltViewModel(),
+    archiveTuneViewModel: ArchiveTuneExploreViewModel = hiltViewModel(),
     navController: NavHostController,
     onSearchBarActiveChange: (Boolean) -> Unit = {}
 ) {
@@ -176,6 +188,10 @@ fun SearchScreen(
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
+
+    val storageFilter by playerViewModel.storageFilter.collectAsStateWithLifecycle()
+    var isOnlineSearch by rememberSaveable(storageFilter) { mutableStateOf(storageFilter != StorageFilter.OFFLINE) }
+    val archiveTuneUiState by archiveTuneViewModel.uiState.collectAsStateWithLifecycle()
 
     // Multi-selection state for songs
     val multiSelectionState = playerViewModel.multiSelectionStateHolder
@@ -255,9 +271,14 @@ fun SearchScreen(
         }
     }
 
-    // Search debouncing is centralized in SearchStateHolder.
-    LaunchedEffect(searchQuery, currentFilter) {
-        playerViewModel.performSearch(searchQuery)
+    // Search debouncing is centralized in SearchStateHolder / ArchiveTuneViewModel.
+    LaunchedEffect(searchQuery, currentFilter, isOnlineSearch) {
+        if (isOnlineSearch) {
+            archiveTuneViewModel.onSearchQueryChanged(searchQuery)
+            archiveTuneViewModel.performSearch(searchQuery)
+        } else {
+            playerViewModel.performSearch(searchQuery)
+        }
     }
     val searchResults = searchUiState.searchResults
     val handleSongMoreOptionsClick: (Song) -> Unit = { song ->
@@ -550,33 +571,146 @@ fun SearchScreen(
                                     .padding(vertical = 8.dp, horizontal = 8.dp)
                             )
                         } else {
-                            FlowRow(
+                            Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 8.dp, horizontal = 8.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(0.dp)
+                                    .padding(vertical = 4.dp, horizontal = 8.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                SearchFilterChip(SearchFilterType.ALL, currentFilter, playerViewModel)
-                                SearchFilterChip(SearchFilterType.SONGS, currentFilter, playerViewModel)
-                                SearchFilterChip(SearchFilterType.ALBUMS, currentFilter, playerViewModel)
-                                SearchFilterChip(SearchFilterType.ARTISTS, currentFilter, playerViewModel)
-                                SearchFilterChip(SearchFilterType.PLAYLISTS, currentFilter, playerViewModel)
+                                // Online vs Device Search Mode Switcher
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    FilledTonalButton(
+                                        onClick = { isOnlineSearch = true },
+                                        shape = CircleShape,
+                                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                                        colors = ButtonDefaults.filledTonalButtonColors(
+                                            containerColor = if (isOnlineSearch) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+                                            contentColor = if (isOnlineSearch) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                        )
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Icon(
+                                                painter = painterResource(R.drawable.ic_youtube_music),
+                                                contentDescription = null,
+                                                tint = Color.Unspecified,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Text(
+                                                text = stringResource(R.string.home_mode_all),
+                                                style = MaterialTheme.typography.labelMedium,
+                                                fontFamily = GoogleSansRounded,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                        }
+                                    }
+
+                                    FilledTonalButton(
+                                        onClick = { isOnlineSearch = false },
+                                        shape = CircleShape,
+                                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                                        colors = ButtonDefaults.filledTonalButtonColors(
+                                            containerColor = if (!isOnlineSearch) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+                                            contentColor = if (!isOnlineSearch) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onSurface
+                                        )
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.PhoneAndroid,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Text(
+                                                text = stringResource(R.string.home_mode_offline),
+                                                style = MaterialTheme.typography.labelMedium,
+                                                fontFamily = GoogleSansRounded,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                        }
+                                    }
+                                }
+
+                                if (isOnlineSearch) {
+                                    FlowRow(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalArrangement = Arrangement.spacedBy(0.dp)
+                                    ) {
+                                        ArchiveTuneSearchCategory.entries.forEach { cat ->
+                                            val isSelected = archiveTuneUiState.activeCategory == cat
+                                            FilterChip(
+                                                selected = isSelected,
+                                                onClick = { archiveTuneViewModel.onCategorySelected(cat) },
+                                                label = {
+                                                    Text(
+                                                        text = cat.label,
+                                                        fontFamily = GoogleSansRounded,
+                                                        style = MaterialTheme.typography.labelMedium,
+                                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                                    )
+                                                },
+                                                colors = FilterChipDefaults.filterChipColors(
+                                                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                                ),
+                                                shape = CircleShape
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    FlowRow(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalArrangement = Arrangement.spacedBy(0.dp)
+                                    ) {
+                                        SearchFilterChip(SearchFilterType.ALL, currentFilter, playerViewModel)
+                                        SearchFilterChip(SearchFilterType.SONGS, currentFilter, playerViewModel)
+                                        SearchFilterChip(SearchFilterType.ALBUMS, currentFilter, playerViewModel)
+                                        SearchFilterChip(SearchFilterType.ARTISTS, currentFilter, playerViewModel)
+                                        SearchFilterChip(SearchFilterType.PLAYLISTS, currentFilter, playerViewModel)
+                                    }
+                                }
                             }
                         }
                         Box(modifier = Modifier.fillMaxSize()) {
-                            Crossfade(
-                                targetState = searchResults.isEmpty(),
-                                animationSpec = tween(durationMillis = 190),
-                                label = "search_results_fade"
-                            ) { isEmpty ->
-                                if (isEmpty) {
-                                    EmptySearchResults(
-                                        searchQuery = searchQuery,
-                                        colorScheme = colorScheme
+                            if (isOnlineSearch) {
+                                OnlineSearchResults(
+                                    items = archiveTuneUiState.searchResults,
+                                    isSearching = archiveTuneUiState.isSearching,
+                                    resolvingSongId = archiveTuneUiState.isResolvingSongId,
+                                    onSongClick = { songItem, contextList ->
+                                        archiveTuneViewModel.playSongItem(
+                                            songItem = songItem,
+                                            contextSongs = contextList,
+                                            playerViewModel = playerViewModel
+                                        )
+                                    },
+                                    contentPadding = PaddingValues(
+                                        bottom = bottomBarHeightDp + bottomGradientHeight + 36.dp
                                     )
-                                } else {
-                                    SearchResultsList(
+                                )
+                            } else {
+                                Crossfade(
+                                    targetState = searchResults.isEmpty(),
+                                    animationSpec = tween(durationMillis = 190),
+                                    label = "search_results_fade"
+                                ) { isEmpty ->
+                                    if (isEmpty) {
+                                        EmptySearchResults(
+                                            searchQuery = searchQuery,
+                                            colorScheme = colorScheme
+                                        )
+                                    } else {
+                                        SearchResultsList(
                                         results = searchResults,
                                         searchQuery = searchQuery,
                                         playerViewModel = playerViewModel,

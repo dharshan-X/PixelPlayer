@@ -278,6 +278,8 @@ class PlayerViewModel @Inject constructor(
 
 
 
+    val storageFilter: StateFlow<com.theveloper.pixelplay.data.model.StorageFilter> = libraryStateHolder.currentStorageFilter
+
     private val _playlistPickerStorageFilter = MutableStateFlow(com.theveloper.pixelplay.data.model.StorageFilter.OFFLINE)
     val playlistPickerStorageFilter: StateFlow<com.theveloper.pixelplay.data.model.StorageFilter> = _playlistPickerStorageFilter.asStateFlow()
 
