@@ -39,7 +39,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.theveloper.pixelplay.ui.theme.AbsoluteSmoothCornerShape
+import racra.compose.smooth_corner_rect_library.AbsoluteSmoothCornerShape
 import com.theveloper.pixelplay.ui.theme.GoogleSansRounded
 import moe.rukamori.archivetune.innertube.models.AlbumItem
 import moe.rukamori.archivetune.innertube.models.ArtistItem
