@@ -37,14 +37,11 @@ include(":shared")
 include(":wear")
 include(":baselineprofile")
 
-include(":archivetune-core")
-project(":archivetune-core").projectDir = file("backend-refences/ArchiveTune/core")
+include(":core")
+project(":core").projectDir = file("backend-refences/ArchiveTune/core")
 
 include(":morideobfuscator")
 project(":morideobfuscator").projectDir = file("backend-refences/ArchiveTune/morideobfuscator")
 
-include(":archivetune-morideobfuscator")
-project(":archivetune-morideobfuscator").projectDir = file("backend-refences/ArchiveTune/morideobfuscator")
-
-include(":archivetune-moriextractor")
-project(":archivetune-moriextractor").projectDir = file("backend-refences/ArchiveTune/moriextractor")
+include(":moriextractor")
+project(":moriextractor").projectDir = file("backend-refences/ArchiveTune/moriextractor")

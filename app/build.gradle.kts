@@ -347,9 +347,9 @@ dependencies {
 
     // Projects
     implementation(project(":shared"))
-    implementation(project(":archivetune-core"))
-    implementation(project(":archivetune-morideobfuscator"))
-    implementation(project(":archivetune-moriextractor"))
+    implementation(project(":core"))
+    implementation(project(":morideobfuscator"))
+    implementation(project(":moriextractor"))
     implementation(libs.rhino)
     implementation(libs.brotli)
     implementation(libs.re2j)
