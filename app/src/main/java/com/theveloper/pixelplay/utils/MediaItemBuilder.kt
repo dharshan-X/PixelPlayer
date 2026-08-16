@@ -145,12 +145,18 @@ object MediaItemBuilder {
         mimeType: String? = null
     ): Uri {
         directLocalFileUri(contentUriString, filePath, mimeType)?.let { return it }
+        if (contentUriString.startsWith("yt_") || contentUriString.startsWith("yt://") || contentUriString.startsWith("archivetune://")) {
+            val raw = contentUriString.removePrefix("yt_").removePrefix("yt://").removePrefix("archivetune://")
+            return Uri.parse("yt://$raw")
+        }
         val uri = runCatching { Uri.parse(contentUriString) }.getOrNull()
             ?: return Uri.fromFile(File(contentUriString))
         // Telegram downloaded files can be stored as absolute paths (without file://).
         // Normalize them so ExoPlayer always gets a canonical local-file URI.
         return if (uri.scheme.isNullOrBlank() && contentUriString.startsWith("/")) {
             Uri.fromFile(File(contentUriString))
+        } else if (uri.scheme.isNullOrBlank() && contentUriString.isNotBlank()) {
+            Uri.parse("yt://$contentUriString")
         } else {
             uri
         }

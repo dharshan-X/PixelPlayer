@@ -1100,9 +1100,14 @@ class DualPlayerEngine @Inject constructor(
         val resolver = object : ResolvingDataSource.Resolver {
             override fun resolveDataSpec(dataSpec: DataSpec): DataSpec {
                 var spec = dataSpec
-                val uri = spec.uri
-                val scheme = uri.scheme
-                if (scheme in CLOUD_PROXY_SCHEMES) {
+                var uri = spec.uri
+                val uriStr = uri.toString()
+                var scheme = uri.scheme
+                if (scheme == null && !uriStr.startsWith("/") && uriStr.isNotBlank()) {
+                    uri = Uri.parse("yt://${uriStr.removePrefix("yt_")}")
+                    scheme = "yt"
+                }
+                if (scheme in CLOUD_PROXY_SCHEMES || uriStr.startsWith("yt_")) {
                     val originalUri = uri.toString()
                     val resolved = resolvedUriCache.get(originalUri) ?: runCatching {
                         kotlinx.coroutines.runBlocking(Dispatchers.IO) {
@@ -1222,7 +1227,9 @@ class DualPlayerEngine @Inject constructor(
         val uriString = uri.toString()
         resolvedUriCache.get(uriString)?.let { return@withContext it }
 
-        val resolved: Uri? = when (uri.scheme) {
+        val scheme = uri.scheme ?: if (uriString.startsWith("yt_") || (!uriString.contains("://") && !uriString.startsWith("/") && uriString.isNotBlank())) "yt" else null
+
+        val resolved: Uri? = when (scheme) {
             "telegram" -> resolveTelegramUriAsync(uri, uriString)
             "netease" -> resolveNeteaseUriAsync(uriString)
             "qqmusic" -> resolveQqMusicUriAsync(uriString)
@@ -1245,9 +1252,10 @@ class DualPlayerEngine @Inject constructor(
             connectivityStateHolder.triggerOfflineBlockedEvent()
             return@withContext null
         }
-        val videoId = uri.host?.takeIf { it.isNotEmpty() }
+        val raw = uri.host?.takeIf { it.isNotEmpty() }
             ?: uri.pathSegments.firstOrNull()
-            ?: uriString.removePrefix("yt://").removePrefix("archivetune://")
+            ?: uriString.removePrefix("yt://").removePrefix("archivetune://").removePrefix("yt_")
+        val videoId = raw.removePrefix("yt://").removePrefix("archivetune://").removePrefix("yt_").substringBefore('?').trim()
         if (videoId.isEmpty()) return@withContext null
 
         val result = archiveTuneStreamResolver.resolveStream(
@@ -1256,7 +1264,13 @@ class DualPlayerEngine @Inject constructor(
             quality = moe.rukamori.archivetune.constants.AudioQuality.HIGH,
             mode = com.theveloper.pixelplay.data.archivetune.StreamBackendMode.AUTO_FALLBACK
         )
-        result.getOrNull()?.streamUrl?.let { Uri.parse(it) }
+        val streamUrl = result.getOrNull()?.streamUrl
+        if (streamUrl != null) {
+            Uri.parse(streamUrl)
+        } else {
+            Timber.tag("DualPlayerEngine").e(result.exceptionOrNull(), "Failed to resolve stream for videoId=%s", videoId)
+            null
+        }
     }
 
     private suspend fun resolveTelegramUriAsync(uri: Uri, uriString: String): Uri? = withContext(Dispatchers.IO) {

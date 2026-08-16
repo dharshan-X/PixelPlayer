@@ -924,16 +924,12 @@ class PlaybackDispatchStateHolder @Inject constructor(
         val mediaItem = MediaItemBuilder.build(song)
         val originalUri = mediaItem.localConfiguration?.uri ?: return mediaItem
         val scheme = originalUri.scheme
-        if (
-            scheme != "telegram" &&
-            scheme != "netease" &&
-            scheme != "qqmusic" &&
-            scheme != "navidrome" &&
-            scheme != "jellyfin" &&
-            scheme != "gdrive" &&
-            scheme != "yt" &&
-            scheme != "archivetune"
-        ) {
+        val uriStr = originalUri.toString()
+        val isCloudScheme = scheme in listOf("telegram", "netease", "qqmusic", "navidrome", "jellyfin", "gdrive", "yt", "archivetune") ||
+            uriStr.startsWith("yt_") ||
+            (!uriStr.contains("://") && !uriStr.startsWith("/"))
+
+        if (!isCloudScheme) {
             return mediaItem
         }
 
@@ -941,8 +937,9 @@ class PlaybackDispatchStateHolder @Inject constructor(
             cb.ensureTelegramObservers()
         }
 
-        val resolvedUri = dualPlayerEngine.resolveCloudUri(originalUri)
-        return if (resolvedUri == originalUri) {
+        val targetUri = if (scheme == null && !uriStr.startsWith("/")) Uri.parse("yt://${uriStr.removePrefix("yt_")}") else originalUri
+        val resolvedUri = dualPlayerEngine.resolveCloudUri(targetUri)
+        return if (resolvedUri == targetUri || resolvedUri == originalUri) {
             mediaItem
         } else {
             mediaItem.buildUpon().setUri(resolvedUri).build()
