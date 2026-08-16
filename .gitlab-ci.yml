@@ -25,6 +25,7 @@ variables:
   #        commandlinetools-os_type-ANDROID_SDK_TOOLS_latest.zip
   # when the script was last modified for latest compileSdkVersion, it was which is written down below
   ANDROID_SDK_TOOLS: "9477386"
+  GIT_SUBMODULE_STRATEGY: recursive     
 
 # Packages installation before running script
 before_script:
