@@ -34,6 +34,7 @@ import com.theveloper.pixelplay.data.database.toSearchHistoryItem
 import com.theveloper.pixelplay.data.database.toSong
 import com.theveloper.pixelplay.data.database.toTelegramEntity
 import com.theveloper.pixelplay.data.database.toTelegramEntityWithThread
+import com.theveloper.pixelplay.data.database.toOnlineSongEntity
 import com.theveloper.pixelplay.data.database.TelegramTopicEntity
 import com.theveloper.pixelplay.data.model.Album
 import com.theveloper.pixelplay.data.model.Artist
@@ -415,7 +416,7 @@ class MusicRepositoryImpl @Inject constructor(
                 artistEntities[artistId] = com.theveloper.pixelplay.data.database.ArtistEntity(
                     id = artistId,
                     name = song.artist.ifBlank { "Unknown Artist" },
-                    songCount = 1
+                    trackCount = 1
                 )
             }
 
@@ -423,11 +424,13 @@ class MusicRepositoryImpl @Inject constructor(
             if (albumId != 0L && !albumEntities.containsKey(albumId)) {
                 albumEntities[albumId] = com.theveloper.pixelplay.data.database.AlbumEntity(
                     id = albumId,
-                    name = song.album.ifBlank { "Unknown Album" },
-                    artist = song.artist.ifBlank { "Unknown Artist" },
+                    title = song.album.ifBlank { "Unknown Album" },
+                    artistName = song.artist.ifBlank { "Unknown Artist" },
                     artistId = artistId,
+                    albumArtUriString = song.albumArtUriString,
                     songCount = 1,
-                    albumArtUri = song.albumArtUriString
+                    dateAdded = System.currentTimeMillis(),
+                    year = song.year
                 )
             }
         }
@@ -873,7 +876,7 @@ class MusicRepositoryImpl @Inject constructor(
         val stringIds = rawIds.map { it.toString() }.toMutableSet()
         val negativeIds = rawIds.filter { it < 0 }
         if (negativeIds.isNotEmpty()) {
-            val songs = musicDao.getSongsByIds(negativeIds).first()
+            val songs = musicDao.getSongsByIdsListSimple(negativeIds)
             for (song in songs) {
                 stringIds.add(song.id.toString())
                 stringIds.add(song.contentUriString)
@@ -893,7 +896,7 @@ class MusicRepositoryImpl @Inject constructor(
                 val stringIds = ids.asSequence().map(Long::toString).toMutableSet()
                 val negativeIds = ids.filter { it < 0 }
                 if (negativeIds.isNotEmpty()) {
-                    val songs = musicDao.getSongsByIds(negativeIds).first()
+                    val songs = musicDao.getSongsByIdsListSimple(negativeIds)
                     for (song in songs) {
                         stringIds.add(song.id.toString())
                         stringIds.add(song.contentUriString)

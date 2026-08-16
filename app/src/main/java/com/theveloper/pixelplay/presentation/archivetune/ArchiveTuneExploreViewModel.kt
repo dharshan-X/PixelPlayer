@@ -25,6 +25,7 @@ import moe.rukamori.archivetune.innertube.models.PlaylistItem
 import moe.rukamori.archivetune.innertube.models.SongItem
 import moe.rukamori.archivetune.innertube.models.YTItem
 import moe.rukamori.archivetune.innertube.pages.HomePage
+import com.theveloper.pixelplay.data.repository.MusicRepository
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -46,8 +47,6 @@ data class ArchiveTuneExploreUiState(
     val isResolvingSongId: String? = null,
     val errorMessage: String? = null
 )
-
-import com.theveloper.pixelplay.data.repository.MusicRepository
 
 @HiltViewModel
 class ArchiveTuneExploreViewModel @Inject constructor(
