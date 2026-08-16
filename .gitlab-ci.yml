@@ -10,11 +10,11 @@
 image: eclipse-temurin:21-jdk-jammy
 
 variables:
-  ANDROID_COMPILE_SDK: "37"
-  ANDROID_BUILD_TOOLS: "35.0.0"
+  ANDROID_COMPILE_SDK: "37.0"
+  ANDROID_BUILD_TOOLS: "37.0.0"
   ANDROID_SDK_TOOLS: "11076708"
   GIT_SUBMODULE_STRATEGY: recursive
-  GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=\"-Xmx3072m -XX:MaxMetaspaceSize=1024m -XX:+UseParallelGC\""
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dandroid.builder.sdkDownload=true -Dorg.gradle.jvmargs=\"-Xmx3072m -XX:MaxMetaspaceSize=1024m -XX:+UseParallelGC\""
 
 # Packages installation before running script
 before_script:
@@ -32,9 +32,9 @@ before_script:
   # Check sdkmanager version and accept licenses
   - sdkmanager --version
   - yes | sdkmanager --licenses > /dev/null || true
-  - sdkmanager "platforms;android-${ANDROID_COMPILE_SDK}"
-  - sdkmanager "platform-tools"
-  - sdkmanager "build-tools;${ANDROID_BUILD_TOOLS}"
+  - sdkmanager "platforms;android-${ANDROID_COMPILE_SDK}" "platforms;android-36" "platforms;android-35" || true
+  - sdkmanager "platform-tools" || true
+  - sdkmanager "build-tools;${ANDROID_BUILD_TOOLS}" "build-tools;35.0.0" || true
 
   - chmod +x ./gradlew
 
