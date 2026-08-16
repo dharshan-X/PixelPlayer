@@ -287,7 +287,15 @@ class DailyMixManager @Inject constructor(
         if (allSongs.isEmpty()) return emptyList()
 
         val engagements = readEngagements()
-        val songById = allSongs.associateBy { it.id }
+        val songById = allSongs.associateBy { it.id }.toMutableMap()
+        allSongs.forEach { song ->
+            songById[song.contentUriString] = song
+            if (song.contentUriString.startsWith("yt://")) {
+                val ytId = song.contentUriString.removePrefix("yt://")
+                songById["yt_$ytId"] = song
+                songById[ytId] = song
+            }
+        }
         val now = System.currentTimeMillis()
 
         val artistAffinity = mutableMapOf<Long, Double>()
@@ -315,6 +323,11 @@ class DailyMixManager @Inject constructor(
 
         return allSongs.map { song ->
             val stats = engagements[song.id]
+                ?: engagements[song.contentUriString]
+                ?: (if (song.contentUriString.startsWith("yt://")) {
+                    val ytId = song.contentUriString.removePrefix("yt://")
+                    engagements["yt_$ytId"] ?: engagements[ytId]
+                } else null)
             val playCountScore = (stats?.playCount?.toDouble() ?: 0.0) / maxPlayCount
             val durationScore = (stats?.totalPlayDurationMs?.toDouble() ?: 0.0) / maxDuration
             val affinityScore = (playCountScore * 0.7 + durationScore * 0.3).coerceIn(0.0, 1.0)
@@ -333,7 +346,10 @@ class DailyMixManager @Inject constructor(
 
             val recencyScore = computeRecencyScore(stats?.lastPlayedTimestamp, now)
             val noveltyScore = computeNoveltyScore(song.dateAdded, now)
-            val favoriteScore = if (favoriteSongIds.contains(song.id)) 1.0 else 0.0
+            val isFavorite = favoriteSongIds.contains(song.id) ||
+                favoriteSongIds.contains(song.contentUriString) ||
+                (song.contentUriString.startsWith("yt://") && favoriteSongIds.contains("yt_" + song.contentUriString.removePrefix("yt://")))
+            val favoriteScore = if (isFavorite) 1.0 else 0.0
             val baselineScore = if (stats == null) 0.1 else 0.0
             val noise = random.nextDouble() * 0.005 // Significantly reduced noise
 

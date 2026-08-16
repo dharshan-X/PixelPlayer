@@ -400,6 +400,47 @@ class MusicRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun saveOnlineSongs(songs: List<Song>) = withContext(Dispatchers.IO) {
+        if (songs.isEmpty()) return@withContext
+        val artistEntities = mutableMapOf<Long, com.theveloper.pixelplay.data.database.ArtistEntity>()
+        val albumEntities = mutableMapOf<Long, com.theveloper.pixelplay.data.database.AlbumEntity>()
+        val songEntities = mutableListOf<com.theveloper.pixelplay.data.database.SongEntity>()
+
+        for (song in songs) {
+            val sEntity = song.toOnlineSongEntity()
+            songEntities.add(sEntity)
+
+            val artistId = sEntity.artistId
+            if (artistId != 0L && !artistEntities.containsKey(artistId)) {
+                artistEntities[artistId] = com.theveloper.pixelplay.data.database.ArtistEntity(
+                    id = artistId,
+                    name = song.artist.ifBlank { "Unknown Artist" },
+                    songCount = 1
+                )
+            }
+
+            val albumId = sEntity.albumId
+            if (albumId != 0L && !albumEntities.containsKey(albumId)) {
+                albumEntities[albumId] = com.theveloper.pixelplay.data.database.AlbumEntity(
+                    id = albumId,
+                    name = song.album.ifBlank { "Unknown Album" },
+                    artist = song.artist.ifBlank { "Unknown Artist" },
+                    artistId = artistId,
+                    songCount = 1,
+                    albumArtUri = song.albumArtUriString
+                )
+            }
+        }
+
+        musicDao.insertArtists(artistEntities.values.toList())
+        musicDao.insertAlbums(albumEntities.values.toList())
+        musicDao.insertSongs(songEntities)
+    }
+
+    override suspend fun saveOnlineSong(song: Song) {
+        saveOnlineSongs(listOf(song))
+    }
+
     override suspend fun replaceTelegramSongsForChannel(chatId: Long, songs: List<Song>) {
         val entities = songs.mapNotNull { it.toTelegramEntity() }.filter { it.chatId == chatId }
         ensureTelegramDownloadSyncObserverStarted()
@@ -811,7 +852,10 @@ class MusicRepositoryImpl @Inject constructor(
     }
 
     override suspend fun setFavoriteStatus(songId: String, isFavorite: Boolean) = withContext(Dispatchers.IO) {
-        val id = songId.toLongOrNull() ?: return@withContext
+        val id = songId.toLongOrNull()
+            ?: getSongIdByContentUri(songId)
+            ?: getSongIdByContentUri("yt://" + songId.removePrefix("yt_"))
+            ?: com.theveloper.pixelplay.data.database.generateDeterministicOnlineSongId(songId)
         if (isFavorite) {
             favoritesDao.setFavorite(
                 com.theveloper.pixelplay.data.database.FavoritesEntity(
@@ -825,22 +869,54 @@ class MusicRepositoryImpl @Inject constructor(
     }
 
     override suspend fun getFavoriteSongIdsOnce(): Set<String> = withContext(Dispatchers.IO) {
-        favoritesDao.getFavoriteSongIdsOnce()
-            .map { it.toString() }
-            .toSet()
+        val rawIds = favoritesDao.getFavoriteSongIdsOnce()
+        val stringIds = rawIds.map { it.toString() }.toMutableSet()
+        val negativeIds = rawIds.filter { it < 0 }
+        if (negativeIds.isNotEmpty()) {
+            val songs = musicDao.getSongsByIds(negativeIds).first()
+            for (song in songs) {
+                stringIds.add(song.id.toString())
+                stringIds.add(song.contentUriString)
+                if (song.contentUriString.startsWith("yt://")) {
+                    val ytId = song.contentUriString.removePrefix("yt://")
+                    stringIds.add("yt_$ytId")
+                    stringIds.add(ytId)
+                }
+            }
+        }
+        stringIds
     }
 
     override fun getFavoriteSongIdsFlow(): Flow<Set<String>> {
         return favoritesDao.getFavoriteSongIds()
-            .map { ids -> ids.asSequence().map(Long::toString).toSet() }
+            .map { ids ->
+                val stringIds = ids.asSequence().map(Long::toString).toMutableSet()
+                val negativeIds = ids.filter { it < 0 }
+                if (negativeIds.isNotEmpty()) {
+                    val songs = musicDao.getSongsByIds(negativeIds).first()
+                    for (song in songs) {
+                        stringIds.add(song.id.toString())
+                        stringIds.add(song.contentUriString)
+                        if (song.contentUriString.startsWith("yt://")) {
+                            val ytId = song.contentUriString.removePrefix("yt://")
+                            stringIds.add("yt_$ytId")
+                            stringIds.add(ytId)
+                        }
+                    }
+                }
+                stringIds
+            }
             .distinctUntilChanged()
     }
 
     override suspend fun toggleFavoriteStatus(songId: String): Boolean = withContext(Dispatchers.IO) {
-        val id = songId.toLongOrNull() ?: return@withContext false
+        val id = songId.toLongOrNull()
+            ?: getSongIdByContentUri(songId)
+            ?: getSongIdByContentUri("yt://" + songId.removePrefix("yt_"))
+            ?: com.theveloper.pixelplay.data.database.generateDeterministicOnlineSongId(songId)
         val isFav = favoritesDao.isFavorite(id) ?: false
         val newFav = !isFav
-        setFavoriteStatus(songId, newFav)
+        setFavoriteStatus(id.toString(), newFav)
         return@withContext newFav
     }
 

@@ -504,6 +504,20 @@ class PlaybackDispatchStateHolder @Inject constructor(
             val validSongs = hydrateSongsIfNeeded(songsToPlay)
             throwIfDirectPlaybackRequestIsStale(requestToken)
 
+            val onlineSongs = validSongs.filter {
+                it.contentUriString.startsWith("yt://") ||
+                it.id.startsWith("yt_") ||
+                it.contentUriString.startsWith("archivetune://") ||
+                it.contentUriString.contains("googlevideo.com")
+            }
+            if (onlineSongs.isNotEmpty()) {
+                cb.scope.launch(Dispatchers.IO) {
+                    runCatching {
+                        musicRepository.saveOnlineSongs(onlineSongs)
+                    }
+                }
+            }
+
             if (validSongs.isEmpty()) {
                 cb.emitToast(context.getString(R.string.player_view_model_no_valid_songs))
                 return@launch

@@ -239,7 +239,15 @@ class PlaybackStatsRepository @Inject constructor(
             )
         }
 
-        val songMap = songs.associateBy { it.id }
+        val songMap = songs.associateBy { it.id }.toMutableMap()
+        songs.forEach { song ->
+            songMap[song.contentUriString] = song
+            if (song.contentUriString.startsWith("yt://")) {
+                val ytId = song.contentUriString.removePrefix("yt://")
+                songMap["yt_$ytId"] = song
+                songMap[ytId] = song
+            }
+        }
         val normalizedEvents = filteredEvents
 
         val segmentsBySong = normalizedEvents
@@ -260,7 +268,7 @@ class PlaybackStatsRepository @Inject constructor(
 
         val allSongs = segmentsBySong
             .mapNotNull { (songId, segmentsForSong) ->
-                val song = songMap[songId] ?: return@mapNotNull null
+                val song = songMap[songId] ?: songMap["yt_$songId"] ?: songMap["yt://$songId"] ?: return@mapNotNull null
                 val title = song.title.takeIf { it.isNotBlank() }
                     ?: song.path.substringAfterLast('/').ifBlank { return@mapNotNull null }
                 val artist = song.displayArtist.takeIf { it.isNotBlank() } ?: "Unknown Artist"

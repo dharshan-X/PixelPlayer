@@ -22,6 +22,7 @@ object SourceType {
     const val QQMUSIC = 4
     const val NAVIDROME = 5
     const val JELLYFIN = 6
+    const val YOUTUBE = 7
 
     /** Derive source type from a content URI string (fallback for migration / conversion). */
     fun fromContentUri(uri: String): Int = when {
@@ -31,6 +32,7 @@ object SourceType {
         uri.startsWith("qqmusic://") -> QQMUSIC
         uri.startsWith("navidrome://") -> NAVIDROME
         uri.startsWith("jellyfin://") -> JELLYFIN
+        uri.startsWith("yt://") || uri.startsWith("archivetune://") || uri.startsWith("yt_") -> YOUTUBE
         else -> LOCAL
     }
 }
@@ -256,7 +258,7 @@ data class SongSummary(
 // (menos probable que se use si la entidad siempre requiere los paths)
 fun Song.toEntityWithoutPaths(): SongEntity {
     return SongEntity(
-        id = this.id.toLong(),
+        id = this.id.toLongOrNull() ?: generateDeterministicOnlineSongId(this.id),
         title = this.title,
         artistName = this.artist,
         artistId = this.artistId,
@@ -281,3 +283,51 @@ fun Song.toEntityWithoutPaths(): SongEntity {
         sourceType = SourceType.fromContentUri(this.contentUriString)
     )
 }
+
+fun generateDeterministicOnlineSongId(rawId: String): Long {
+    rawId.toLongOrNull()?.let { return it }
+    val hash = kotlin.math.abs(rawId.hashCode().toLong())
+    return -(700_000_000_000_000L + (hash % 100_000_000_000L))
+}
+
+fun generateDeterministicOnlineAlbumId(albumName: String, artistName: String): Long {
+    val hash = kotlin.math.abs("$albumName:$artistName".hashCode().toLong())
+    return -(710_000_000_000_000L + (hash % 100_000_000_000L))
+}
+
+fun generateDeterministicOnlineArtistId(artistName: String): Long {
+    val hash = kotlin.math.abs(artistName.hashCode().toLong())
+    return -(720_000_000_000_000L + (hash % 100_000_000_000L))
+}
+
+fun Song.toOnlineSongEntity(): SongEntity {
+    val numId = generateDeterministicOnlineSongId(this.id)
+    val numArtistId = if (this.artistId != 0L) this.artistId else generateDeterministicOnlineArtistId(this.artist)
+    val numAlbumId = if (this.albumId != 0L) this.albumId else generateDeterministicOnlineAlbumId(this.album, this.artist)
+    return SongEntity(
+        id = numId,
+        title = this.title,
+        artistName = this.artist,
+        artistId = numArtistId,
+        albumArtist = this.albumArtist,
+        albumName = this.album,
+        albumId = numAlbumId,
+        contentUriString = this.contentUriString,
+        albumArtUriString = this.albumArtUriString,
+        duration = this.duration,
+        genre = this.genre,
+        isFavorite = this.isFavorite,
+        lyrics = this.lyrics,
+        trackNumber = this.trackNumber,
+        discNumber = this.discNumber,
+        filePath = this.path.ifBlank { "https://music.youtube.com/watch?v=${this.id.removePrefix("yt_").removePrefix("yt://")}" },
+        parentDirectoryPath = "https://music.youtube.com",
+        dateAdded = if (this.dateAdded > 0) this.dateAdded else System.currentTimeMillis(),
+        year = this.year,
+        mimeType = this.mimeType,
+        bitrate = this.bitrate,
+        sampleRate = this.sampleRate,
+        sourceType = SourceType.YOUTUBE
+    )
+}
+

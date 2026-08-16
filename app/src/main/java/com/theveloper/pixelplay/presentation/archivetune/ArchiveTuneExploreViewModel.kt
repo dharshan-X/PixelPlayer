@@ -47,10 +47,13 @@ data class ArchiveTuneExploreUiState(
     val errorMessage: String? = null
 )
 
+import com.theveloper.pixelplay.data.repository.MusicRepository
+
 @HiltViewModel
 class ArchiveTuneExploreViewModel @Inject constructor(
     @ApplicationContext private val appContext: Context,
-    private val streamResolver: ArchiveTuneStreamResolver
+    private val streamResolver: ArchiveTuneStreamResolver,
+    private val musicRepository: MusicRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ArchiveTuneExploreUiState())
@@ -201,6 +204,10 @@ class ArchiveTuneExploreViewModel @Inject constructor(
                         }
                     } else {
                         listOf(resolvedSong)
+                    }
+
+                    runCatching {
+                        musicRepository.saveOnlineSongs(queueSongs)
                     }
 
                     playerViewModel.showAndPlaySong(
