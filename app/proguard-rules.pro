@@ -213,3 +213,26 @@
     public static int d(...);
     public static int i(...);
 }
+
+# =============================================================================
+# RHINO JAVASCRIPT ENGINE & ARCHIVETUNE / NEWPIPE EXTRACTOR RULES
+# =============================================================================
+-keep class org.schabi.newpipe.extractor.services.youtube.protos.** { *; }
+-keep class org.schabi.newpipe.extractor.timeago.patterns.** { *; }
+-keep class org.schabi.newpipe.extractor.** { *; }
+-keepclassmembers class org.schabi.newpipe.extractor.** { *; }
+
+-keep class org.mozilla.javascript.** { *; }
+-keep class org.mozilla.javascript.engine.** { *; }
+-keep class org.mozilla.classfile.ClassFileWriter
+-dontwarn org.mozilla.javascript.**
+-dontwarn org.mozilla.javascript.JavaToJSONConverters
+-dontwarn org.mozilla.javascript.tools.**
+
+# Java Desktop classes referenced by Rhino on JVM but absent on Android
+-dontwarn java.beans.**
+-dontwarn javax.script.**
+-dontwarn jdk.dynalink.**
+
+-keep class moe.rukamori.archivetune.** { *; }
+-keepclassmembers class moe.rukamori.archivetune.** { *; }
