@@ -161,15 +161,15 @@ object MediaItemBuilder {
         filePath: String?,
         mimeType: String?
     ): String? {
-        val normalizedMimeType = mimeType?.trim()?.lowercase()
-        if (normalizedMimeType.isNullOrBlank()) {
+        val baseMimeType = mimeType?.substringBefore(';')?.trim()?.lowercase()
+        if (baseMimeType.isNullOrBlank()) {
             return null
         }
 
         val isLikelyLocalMedia = LocalArtworkUri.isLikelyLocalMedia(contentUriString) ||
             filePath?.startsWith("/") == true
         if (!isLikelyLocalMedia) {
-            return mimeType
+            return baseMimeType
         }
 
         val extension = filePath
@@ -178,12 +178,12 @@ object MediaItemBuilder {
             .orEmpty()
 
         return if (
-            normalizedMimeType in EXTRACTOR_FIRST_MIME_TYPES ||
+            baseMimeType in EXTRACTOR_FIRST_MIME_TYPES ||
             extension in DIRECT_FILE_URI_EXTENSIONS
         ) {
             null
         } else {
-            mimeType
+            baseMimeType
         }
     }
 

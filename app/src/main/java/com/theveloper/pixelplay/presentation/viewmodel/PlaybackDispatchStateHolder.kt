@@ -916,7 +916,9 @@ class PlaybackDispatchStateHolder @Inject constructor(
             scheme != "qqmusic" &&
             scheme != "navidrome" &&
             scheme != "jellyfin" &&
-            scheme != "gdrive"
+            scheme != "gdrive" &&
+            scheme != "yt" &&
+            scheme != "archivetune"
         ) {
             return mediaItem
         }

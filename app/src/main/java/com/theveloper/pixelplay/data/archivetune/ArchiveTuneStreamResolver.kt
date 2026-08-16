@@ -54,13 +54,19 @@ class ArchiveTuneStreamResolver @Inject constructor(
             return@runCatching ArchiveTuneStreamResult(
                 videoId = videoId,
                 streamUrl = data.streamUrl,
-                mimeType = data.format.mimeType,
+                mimeType = data.format.mimeType.substringBefore(';').trim(),
                 bitrate = data.format.bitrate,
                 expiresInSeconds = data.streamExpiresInSeconds,
                 clientName = requestProfile.resolvedClientFamily,
                 userAgent = requestProfile.userAgent,
                 origin = requestProfile.origin,
                 referer = requestProfile.referer
+            )
+        } else {
+            timber.log.Timber.tag("ArchiveTuneStreamResolver").w(
+                nativeResult.exceptionOrNull(),
+                "Native playback resolution failed for videoId=%s",
+                videoId
             )
         }
 

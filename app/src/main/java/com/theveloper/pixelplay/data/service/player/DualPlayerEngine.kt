@@ -1104,8 +1104,13 @@ class DualPlayerEngine @Inject constructor(
                 val scheme = uri.scheme
                 if (scheme in CLOUD_PROXY_SCHEMES) {
                     val originalUri = uri.toString()
-                    val resolved = resolvedUriCache.get(originalUri)
-                    if (resolved != null) {
+                    val resolved = resolvedUriCache.get(originalUri) ?: runCatching {
+                        kotlinx.coroutines.runBlocking(Dispatchers.IO) {
+                            resolveCloudUri(uri)
+                        }
+                    }.getOrNull()
+
+                    if (resolved != null && resolved != uri) {
                         spec = spec.buildUpon().setUri(resolved).build()
                     } else {
                         Timber.tag("DualPlayerEngine").d("resolveDataSpec: Cache MISS for %s — using original URI", scheme)
