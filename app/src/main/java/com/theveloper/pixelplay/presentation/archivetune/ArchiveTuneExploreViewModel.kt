@@ -196,7 +196,7 @@ class ArchiveTuneExploreViewModel @Inject constructor(
                             if (item.id == songItem.id) {
                                 resolvedSong
                             } else {
-                                mapSongItemToSong(item, item.id, "audio/mp4", 160000)
+                                mapSongItemToSong(item, "yt://${item.id}", "audio/webm", 160000)
                             }
                         }
                     } else {

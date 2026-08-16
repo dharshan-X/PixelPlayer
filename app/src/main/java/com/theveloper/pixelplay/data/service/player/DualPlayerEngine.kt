@@ -221,7 +221,8 @@ class DualPlayerEngine @Inject constructor(
     private val jellyfinStreamProxy: com.theveloper.pixelplay.data.jellyfin.JellyfinStreamProxy,
     private val gdriveStreamProxy: com.theveloper.pixelplay.data.gdrive.GDriveStreamProxy,
     private val telegramCacheManager: com.theveloper.pixelplay.data.telegram.TelegramCacheManager,
-    private val connectivityStateHolder: com.theveloper.pixelplay.presentation.viewmodel.ConnectivityStateHolder
+    private val connectivityStateHolder: com.theveloper.pixelplay.presentation.viewmodel.ConnectivityStateHolder,
+    private val archiveTuneStreamResolver: com.theveloper.pixelplay.data.archivetune.ArchiveTuneStreamResolver
 ) {
     private companion object {
         private const val AUDIO_OFFLOAD_STALL_FALLBACK_MS = 4_000L
@@ -234,10 +235,10 @@ class DualPlayerEngine @Inject constructor(
         private const val POST_TRANSITION_OFFLOAD_GUARD_MS = 2_000L
         private const val MAX_AUXILIARY_TIMELINE_ITEMS = 200
         private val LOCAL_MEDIA_SCHEMES = setOf("content", "file", "android.resource")
-        private val REMOTE_MEDIA_SCHEMES = setOf("http", "https", "telegram", "netease", "qqmusic", "navidrome", "jellyfin", "gdrive")
+        private val REMOTE_MEDIA_SCHEMES = setOf("http", "https", "telegram", "netease", "qqmusic", "navidrome", "jellyfin", "gdrive", "yt", "archivetune")
         // Subset of REMOTE_MEDIA_SCHEMES: schemes that need proxy resolution.
         // http/https resolve directly and must NOT enter the resolvedUriCache lookup path.
-        private val CLOUD_PROXY_SCHEMES = setOf("telegram", "netease", "qqmusic", "navidrome", "jellyfin", "gdrive")
+        private val CLOUD_PROXY_SCHEMES = setOf("telegram", "netease", "qqmusic", "navidrome", "jellyfin", "gdrive", "yt", "archivetune")
     }
 
     data class TransitionTarget(
@@ -1098,17 +1099,30 @@ class DualPlayerEngine @Inject constructor(
             
         val resolver = object : ResolvingDataSource.Resolver {
             override fun resolveDataSpec(dataSpec: DataSpec): DataSpec {
-                val uri = dataSpec.uri
+                var spec = dataSpec
+                val uri = spec.uri
                 val scheme = uri.scheme
                 if (scheme in CLOUD_PROXY_SCHEMES) {
                     val originalUri = uri.toString()
                     val resolved = resolvedUriCache.get(originalUri)
                     if (resolved != null) {
-                        return dataSpec.buildUpon().setUri(resolved).build()
+                        spec = spec.buildUpon().setUri(resolved).build()
+                    } else {
+                        Timber.tag("DualPlayerEngine").d("resolveDataSpec: Cache MISS for %s — using original URI", scheme)
                     }
-                    Timber.tag("DualPlayerEngine").d("resolveDataSpec: Cache MISS for %s — using original URI", scheme)
                 }
-                return dataSpec
+
+                val targetUri = spec.uri
+                val urlStr = targetUri.toString()
+                if (urlStr.contains("videoplayback") || targetUri.getQueryParameter("c") != null) {
+                    val profile = moe.rukamori.archivetune.utils.StreamClientUtils.resolveRequestProfile(urlStr)
+                    val headers = HashMap(spec.httpRequestHeaders)
+                    headers["User-Agent"] = profile.userAgent
+                    profile.origin?.let { headers["Origin"] = it }
+                    profile.referer?.let { headers["Referer"] = it }
+                    spec = spec.buildUpon().setHttpRequestHeaders(headers).build()
+                }
+                return spec
             }
         }
         
@@ -1204,6 +1218,7 @@ class DualPlayerEngine @Inject constructor(
             "navidrome" -> resolveNavidromeUriAsync(uriString)
             "jellyfin" -> resolveJellyfinUriAsync(uriString)
             "gdrive" -> resolveGDriveUriAsync(uriString)
+            "yt", "archivetune" -> resolveArchiveTuneUriAsync(uri, uriString)
             else -> null
         }
 
@@ -1212,6 +1227,25 @@ class DualPlayerEngine @Inject constructor(
             return@withContext resolved
         }
         uri
+    }
+
+    private suspend fun resolveArchiveTuneUriAsync(uri: Uri, uriString: String): Uri? = withContext(Dispatchers.IO) {
+        if (!connectivityStateHolder.isOnline.value) {
+            connectivityStateHolder.triggerOfflineBlockedEvent()
+            return@withContext null
+        }
+        val videoId = uri.host?.takeIf { it.isNotEmpty() }
+            ?: uri.pathSegments.firstOrNull()
+            ?: uriString.removePrefix("yt://").removePrefix("archivetune://")
+        if (videoId.isEmpty()) return@withContext null
+
+        val result = archiveTuneStreamResolver.resolveStream(
+            context = context,
+            videoId = videoId,
+            quality = moe.rukamori.archivetune.constants.AudioQuality.HIGH,
+            mode = com.theveloper.pixelplay.data.archivetune.StreamBackendMode.AUTO_FALLBACK
+        )
+        result.getOrNull()?.streamUrl?.let { Uri.parse(it) }
     }
 
     private suspend fun resolveTelegramUriAsync(uri: Uri, uriString: String): Uri? = withContext(Dispatchers.IO) {
