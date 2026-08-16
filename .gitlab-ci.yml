@@ -38,6 +38,7 @@ before_script:
 
   - chmod +x ./gradlew
 
+
 # Build Phone Debug APK
 assembleDebug:
   interruptible: true
@@ -47,6 +48,18 @@ assembleDebug:
   artifacts:
     paths:
       - app/build/outputs/apk/debug/
+    expire_in: 7 days
+
+
+#Build Phone Release Apk
+assembleRelease:
+  interruptible: true
+  stage: build
+  script:
+    - ./gradlew :app:assembleRelease -Ppixelplay.enableAbiSplits=true --max-workers=2
+  artifacts:
+    paths:
+      - app/build/outputs/apk/release/
     expire_in: 7 days
 
 # Run Unit Tests
