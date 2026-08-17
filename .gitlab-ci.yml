@@ -13,7 +13,6 @@ cache:
   key:
     files:
       - gradle/wrapper/gradle-wrapper.properties
-      - build.gradle.kts
       - app/build.gradle.kts
     prefix: "$CI_COMMIT_REF_SLUG"
   paths:
