@@ -27,6 +27,8 @@ import moe.rukamori.archivetune.innertube.models.PlaylistItem
 import moe.rukamori.archivetune.innertube.models.SongItem
 import moe.rukamori.archivetune.innertube.models.YTItem
 import moe.rukamori.archivetune.innertube.pages.HomePage
+import android.net.Uri
+import com.theveloper.pixelplay.data.service.player.DualPlayerEngine
 import com.theveloper.pixelplay.data.repository.MusicRepository
 import timber.log.Timber
 import javax.inject.Inject
@@ -54,7 +56,8 @@ data class ArchiveTuneExploreUiState(
 class ArchiveTuneExploreViewModel @Inject constructor(
     @ApplicationContext private val appContext: Context,
     private val streamResolver: ArchiveTuneStreamResolver,
-    private val musicRepository: MusicRepository
+    private val musicRepository: MusicRepository,
+    private val dualPlayerEngine: DualPlayerEngine
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ArchiveTuneExploreUiState())
@@ -214,14 +217,18 @@ class ArchiveTuneExploreViewModel @Inject constructor(
                 }
 
                 streamResult.onSuccess { resolved ->
-                    val resolvedSong = mapSongItemToSong(songItem, resolved.streamUrl, resolved.mimeType, resolved.bitrate)
+                    val resolvedUri = Uri.parse(resolved.streamUrl)
+                    dualPlayerEngine.cacheResolvedUri("yt://${songItem.id}", resolvedUri)
+                    dualPlayerEngine.cacheResolvedUri("yt_${songItem.id}", resolvedUri)
+
+                    val resolvedSong = mapSongItemToSong(songItem, resolved.mimeType, resolved.bitrate)
                     
                     val queueSongs = if (contextSongs.isNotEmpty()) {
                         contextSongs.map { item ->
                             if (item.id == songItem.id) {
                                 resolvedSong
                             } else {
-                                mapSongItemToSong(item, "yt://${item.id}", "audio/webm", 160000)
+                                mapSongItemToSong(item, "audio/webm", 160000)
                             }
                         }
                     } else {
@@ -256,7 +263,6 @@ class ArchiveTuneExploreViewModel @Inject constructor(
 
     private fun mapSongItemToSong(
         songItem: SongItem,
-        streamUrl: String,
         mimeType: String,
         bitrate: Int?
     ): Song {
@@ -272,8 +278,8 @@ class ArchiveTuneExploreViewModel @Inject constructor(
             album = albumName,
             albumId = -1L,
             albumArtist = artistName,
-            path = "",
-            contentUriString = streamUrl,
+            path = "yt://${songItem.id}",
+            contentUriString = "yt://${songItem.id}",
             albumArtUriString = songItem.thumbnail,
             duration = durationMs,
             mimeType = mimeType,

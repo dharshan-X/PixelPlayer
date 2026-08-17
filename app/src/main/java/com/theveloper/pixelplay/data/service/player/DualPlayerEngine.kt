@@ -23,6 +23,10 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.ResolvingDataSource
+import androidx.media3.datasource.okhttp.OkHttpDataSource
+import com.theveloper.pixelplay.data.archivetune.ArchiveTuneHeaderInterceptor
+import okhttp3.OkHttpClient
+import java.util.concurrent.TimeUnit
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
@@ -762,6 +766,20 @@ class DualPlayerEngine @Inject constructor(
     private var isReleased = false
     private val resolvedUriCache = LruCache<String, Uri>(100)
 
+    private val mediaOkHttpClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .addInterceptor(ArchiveTuneHeaderInterceptor())
+            .followRedirects(true)
+            .followSslRedirects(true)
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(20, TimeUnit.SECONDS)
+            .build()
+    }
+
+    fun cacheResolvedUri(uriString: String, resolvedUri: Uri) {
+        resolvedUriCache.put(uriString, resolvedUri)
+    }
+
     // Whether the OS classifies this as a low-RAM device. Used to cap the player's max
     // prefetch depth so hi-res/lossless buffering (and the second player during a crossfade)
     // can't balloon peak memory on constrained hardware. Cached: it never changes at runtime.
@@ -1136,10 +1154,7 @@ class DualPlayerEngine @Inject constructor(
             }
         }
         
-        val httpDataSourceFactory = androidx.media3.datasource.DefaultHttpDataSource.Factory()
-            .setAllowCrossProtocolRedirects(true)
-            .setConnectTimeoutMs(15000)
-            .setReadTimeoutMs(15000)
+        val httpDataSourceFactory = OkHttpDataSource.Factory(mediaOkHttpClient)
 
         val dataSourceFactory = DefaultDataSource.Factory(context, httpDataSourceFactory)
         val resolvingFactory = ResolvingDataSource.Factory(dataSourceFactory, resolver)
@@ -1266,7 +1281,11 @@ class DualPlayerEngine @Inject constructor(
         )
         val streamUrl = result.getOrNull()?.streamUrl
         if (streamUrl != null) {
-            Uri.parse(streamUrl)
+            val parsed = Uri.parse(streamUrl)
+            resolvedUriCache.put(uriString, parsed)
+            resolvedUriCache.put("yt://$videoId", parsed)
+            resolvedUriCache.put("yt_$videoId", parsed)
+            parsed
         } else {
             Timber.tag("DualPlayerEngine").e(result.exceptionOrNull(), "Failed to resolve stream for videoId=%s", videoId)
             null

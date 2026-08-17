@@ -40,34 +40,45 @@ class ArchiveTuneStreamResolver @Inject constructor(
             )
         }
 
-        val nativeResult = YTPlayerUtils.playerResponseForPlayback(
-            videoId = videoId,
-            playlistId = null,
-            audioQuality = quality,
-            connectivityManager = connectivityManager,
-            preferredStreamClient = PlayerStreamClient.WEB_REMIX
+        val preferredClients = listOf(
+            PlayerStreamClient.ANDROID_VR,
+            PlayerStreamClient.WEB_REMIX,
+            PlayerStreamClient.TVHTML5
         )
 
-        if (nativeResult.isSuccess) {
-            val data = nativeResult.getOrThrow()
-            val requestProfile = StreamClientUtils.resolveRequestProfile(data.streamUrl)
-            return@runCatching ArchiveTuneStreamResult(
+        var lastException: Throwable? = null
+        for (client in preferredClients) {
+            val nativeResult = YTPlayerUtils.playerResponseForPlayback(
                 videoId = videoId,
-                streamUrl = data.streamUrl,
-                mimeType = data.format.mimeType.substringBefore(';').trim(),
-                bitrate = data.format.bitrate,
-                expiresInSeconds = data.streamExpiresInSeconds,
-                clientName = requestProfile.resolvedClientFamily,
-                userAgent = requestProfile.userAgent,
-                origin = requestProfile.origin,
-                referer = requestProfile.referer
+                playlistId = null,
+                audioQuality = quality,
+                connectivityManager = connectivityManager,
+                preferredStreamClient = client
             )
-        } else {
-            timber.log.Timber.tag("ArchiveTuneStreamResolver").w(
-                nativeResult.exceptionOrNull(),
-                "Native playback resolution failed for videoId=%s",
-                videoId
-            )
+
+            if (nativeResult.isSuccess) {
+                val data = nativeResult.getOrThrow()
+                val requestProfile = StreamClientUtils.resolveRequestProfile(data.streamUrl)
+                return@runCatching ArchiveTuneStreamResult(
+                    videoId = videoId,
+                    streamUrl = data.streamUrl,
+                    mimeType = data.format.mimeType.substringBefore(';').trim(),
+                    bitrate = data.format.bitrate,
+                    expiresInSeconds = data.streamExpiresInSeconds,
+                    clientName = requestProfile.resolvedClientFamily,
+                    userAgent = requestProfile.userAgent,
+                    origin = requestProfile.origin,
+                    referer = requestProfile.referer
+                )
+            } else {
+                lastException = nativeResult.exceptionOrNull()
+                timber.log.Timber.tag("ArchiveTuneStreamResolver").w(
+                    lastException,
+                    "Native playback resolution failed with client=%s for videoId=%s",
+                    client,
+                    videoId
+                )
+            }
         }
 
         if (mode == StreamBackendMode.AUTO_FALLBACK) {
@@ -89,6 +100,6 @@ class ArchiveTuneStreamResolver @Inject constructor(
             }
         }
 
-        throw nativeResult.exceptionOrNull() ?: IllegalStateException("Failed to resolve stream for $videoId")
+        throw lastException ?: IllegalStateException("Failed to resolve stream for $videoId")
     }
 }
