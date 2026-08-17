@@ -98,11 +98,13 @@ fun HeroDetailHeader(
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        0.0f to Color.Black.copy(alpha = 0.45f),
-                        0.25f to Color.Transparent,
-                        0.60f to MaterialTheme.colorScheme.surface.copy(alpha = 0.75f),
-                        0.85f to MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
-                        1.0f to MaterialTheme.colorScheme.surface
+                        colors = listOf(
+                            Color.Black.copy(alpha = 0.45f),
+                            Color.Transparent,
+                            MaterialTheme.colorScheme.surface.copy(alpha = 0.75f),
+                            MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+                            MaterialTheme.colorScheme.surface
+                        )
                     )
                 )
         )
