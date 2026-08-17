@@ -613,9 +613,6 @@ fun HomeScreen(
         val isJellyfinLoggedIn by jellyfinViewModel.isLoggedIn.collectAsStateWithLifecycle()
         StreamingProviderSheet(
             onDismissRequest = { showStreamingProviderSheet = false },
-            onNavigateToArchiveTuneExplore = {
-                navController.navigateSafely(Screen.ArchiveTuneExplore.route)
-            },
             isNeteaseLoggedIn = isNeteaseLoggedIn,
             onNavigateToNeteaseDashboard = {
                 navController.navigateSafely(Screen.NeteaseDashboard.route)
