@@ -779,10 +779,13 @@ class MusicRepositoryImpl @Inject constructor(
         val blockedDirs = userPreferencesRepository.blockedDirectoriesFlow.first()
         val (allowedParentDirs, applyDirectoryFilter) =
             computeAllowedDirs(allowedDirs, blockedDirs)
-        musicDao.getAllSongs(
+        val localSongs = musicDao.getAllSongs(
             allowedParentDirs = allowedParentDirs,
             applyDirectoryFilter = applyDirectoryFilter
         ).first().map { it.toSong() }
+        val allEntities = musicDao.getAllSongsList()
+        val onlineSongs = allEntities.filter { it.sourceType != 0 }.map { it.toSong() }
+        (localSongs + onlineSongs).distinctBy { it.id }
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
