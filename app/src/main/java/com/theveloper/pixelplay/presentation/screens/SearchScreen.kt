@@ -725,6 +725,8 @@ fun SearchScreen(
                                 OnlineSearchResults(
                                     items = archiveTuneUiState.searchResults,
                                     isSearching = archiveTuneUiState.isSearching,
+                                    isLoadingMore = archiveTuneUiState.isLoadingMoreSearch,
+                                    onLoadMore = { archiveTuneViewModel.loadMoreSearchResults() },
                                     resolvingSongId = archiveTuneUiState.isResolvingSongId,
                                     onSongClick = { songItem, contextList ->
                                         archiveTuneViewModel.playSongItem(

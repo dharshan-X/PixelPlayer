@@ -48,6 +48,8 @@ data class ArchiveTuneExploreUiState(
     val activeCategory: ArchiveTuneSearchCategory = ArchiveTuneSearchCategory.ALL,
     val isSearching: Boolean = false,
     val searchResults: List<YTItem> = emptyList(),
+    val searchContinuationToken: String? = null,
+    val isLoadingMoreSearch: Boolean = false,
     val isResolvingSongId: String? = null,
     val errorMessage: String? = null
 )
@@ -115,7 +117,15 @@ class ArchiveTuneExploreViewModel @Inject constructor(
         _uiState.update { it.copy(searchQuery = newQuery) }
         if (newQuery.isBlank()) {
             searchJob?.cancel()
-            _uiState.update { it.copy(isSearching = false, searchResults = emptyList(), errorMessage = null) }
+            _uiState.update {
+                it.copy(
+                    isSearching = false,
+                    searchResults = emptyList(),
+                    searchContinuationToken = null,
+                    isLoadingMoreSearch = false,
+                    errorMessage = null
+                )
+            }
         }
     }
 
@@ -134,7 +144,15 @@ class ArchiveTuneExploreViewModel @Inject constructor(
     ) {
         val trimmed = query.trim()
         if (trimmed.isBlank()) {
-            _uiState.update { it.copy(isSearching = false, searchResults = emptyList(), errorMessage = null) }
+            _uiState.update {
+                it.copy(
+                    isSearching = false,
+                    searchResults = emptyList(),
+                    searchContinuationToken = null,
+                    isLoadingMoreSearch = false,
+                    errorMessage = null
+                )
+            }
             return
         }
 
@@ -143,7 +161,14 @@ class ArchiveTuneExploreViewModel @Inject constructor(
             if (debounceMillis > 0) {
                 delay(debounceMillis)
             }
-            _uiState.update { it.copy(isSearching = true, errorMessage = null) }
+            _uiState.update {
+                it.copy(
+                    isSearching = true,
+                    searchContinuationToken = null,
+                    isLoadingMoreSearch = false,
+                    errorMessage = null
+                )
+            }
             try {
                 val filter = category.filter
                 val searchResult = withContext(Dispatchers.IO) {
@@ -157,7 +182,9 @@ class ArchiveTuneExploreViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             isSearching = false,
-                            searchResults = result.items,
+                            searchResults = result.items.distinctBy { item -> item.id },
+                            searchContinuationToken = result.continuation,
+                            isLoadingMoreSearch = false,
                             errorMessage = null
                         )
                     }
@@ -169,6 +196,8 @@ class ArchiveTuneExploreViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             isSearching = false,
+                            searchContinuationToken = null,
+                            isLoadingMoreSearch = false,
                             errorMessage = err.localizedMessage ?: "Search failed"
                         )
                     }
@@ -181,9 +210,39 @@ class ArchiveTuneExploreViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         isSearching = false,
+                        searchContinuationToken = null,
+                        isLoadingMoreSearch = false,
                         errorMessage = e.localizedMessage ?: "Search network error"
                     )
                 }
+            }
+        }
+    }
+
+    fun loadMoreSearchResults() {
+        val token = _uiState.value.searchContinuationToken ?: return
+        if (_uiState.value.isLoadingMoreSearch || _uiState.value.isSearching) return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoadingMoreSearch = true) }
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    YouTube.searchContinuation(token)
+                }
+                result.onSuccess { continuationResult ->
+                    _uiState.update { current ->
+                        val newItems = (current.searchResults + continuationResult.items).distinctBy { it.id }
+                        current.copy(
+                            searchResults = newItems,
+                            searchContinuationToken = continuationResult.continuation,
+                            isLoadingMoreSearch = false
+                        )
+                    }
+                }.onFailure {
+                    _uiState.update { it.copy(isLoadingMoreSearch = false) }
+                }
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isLoadingMoreSearch = false) }
             }
         }
     }
@@ -194,7 +253,9 @@ class ArchiveTuneExploreViewModel @Inject constructor(
             it.copy(
                 searchQuery = "",
                 isSearching = false,
-                searchResults = emptyList()
+                searchResults = emptyList(),
+                searchContinuationToken = null,
+                isLoadingMoreSearch = false
             )
         }
     }

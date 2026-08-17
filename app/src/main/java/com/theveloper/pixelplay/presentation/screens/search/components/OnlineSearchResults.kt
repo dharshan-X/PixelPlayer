@@ -29,6 +29,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -54,12 +58,28 @@ fun OnlineSearchResults(
     resolvingSongId: String?,
     onSongClick: (SongItem, List<SongItem>) -> Unit,
     modifier: Modifier = Modifier,
+    isLoadingMore: Boolean = false,
+    onLoadMore: (() -> Unit)? = null,
     onAlbumClick: ((AlbumItem) -> Unit)? = null,
     onArtistClick: ((ArtistItem) -> Unit)? = null,
     onPlaylistClick: ((PlaylistItem) -> Unit)? = null,
     listState: LazyListState = rememberLazyListState(),
     contentPadding: PaddingValues = PaddingValues(0.dp)
 ) {
+    val shouldLoadMore by remember {
+        derivedStateOf {
+            val layoutInfo = listState.layoutInfo
+            val totalItemsNumber = layoutInfo.totalItemsCount
+            val lastVisibleItemIndex = (layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0) + 1
+            lastVisibleItemIndex > (totalItemsNumber - 4) && totalItemsNumber > 0
+        }
+    }
+    LaunchedEffect(shouldLoadMore) {
+        if (shouldLoadMore && !isLoadingMore) {
+            onLoadMore?.invoke()
+        }
+    }
+
     if (isSearching && items.isEmpty()) {
         Box(
             modifier = modifier
@@ -126,6 +146,23 @@ fun OnlineSearchResults(
                     OnlinePlaylistResultRow(
                         item = item,
                         onClick = onPlaylistClick?.let { { it(item) } }
+                    )
+                }
+            }
+        }
+
+        if (isLoadingMore) {
+            item(key = "loading_more_indicator") {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(28.dp),
+                        strokeWidth = 2.5.dp,
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
             }
