@@ -21,13 +21,13 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,6 +44,8 @@ import com.theveloper.pixelplay.R
 import racra.compose.smooth_corner_rect_library.AbsoluteSmoothCornerShape
 import com.theveloper.pixelplay.ui.theme.GoogleSansRounded
 import moe.rukamori.archivetune.innertube.models.AlbumItem
+import moe.rukamori.archivetune.innertube.models.ArtistItem
+import moe.rukamori.archivetune.innertube.models.PlaylistItem
 import moe.rukamori.archivetune.innertube.models.SongItem
 import moe.rukamori.archivetune.innertube.models.YTItem
 import moe.rukamori.archivetune.innertube.pages.HomePage
@@ -54,7 +56,10 @@ fun HomeOnlineQuickPicksSection(
     isLoading: Boolean,
     resolvingSongId: String?,
     onSongClick: (SongItem, List<SongItem>) -> Unit,
-    onNavigateToExplore: () -> Unit,
+    onAlbumClick: (AlbumItem) -> Unit,
+    onArtistClick: (ArtistItem) -> Unit,
+    onPlaylistClick: (PlaylistItem) -> Unit,
+    onRefresh: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     if (sections.isEmpty() && !isLoading) return
@@ -92,28 +97,12 @@ fun HomeOnlineQuickPicksSection(
                 )
             }
 
-            TextButton(
-                onClick = onNavigateToExplore,
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        text = "Explore",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontFamily = GoogleSansRounded,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
+            IconButton(onClick = onRefresh) {
+                Icon(
+                    imageVector = Icons.Rounded.Refresh,
+                    contentDescription = "Refresh",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
 
@@ -130,8 +119,8 @@ fun HomeOnlineQuickPicksSection(
                 )
             }
         } else {
-            // Render first 2-3 sections as carousels
-            sections.take(3).forEach { section ->
+            // Render all sections as carousels
+            sections.forEach { section ->
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -159,7 +148,9 @@ fun HomeOnlineQuickPicksSection(
                                 onClick = {
                                     when (item) {
                                         is SongItem -> onSongClick(item, songsInSection)
-                                        else -> onNavigateToExplore()
+                                        is AlbumItem -> onAlbumClick(item)
+                                        is ArtistItem -> onArtistClick(item)
+                                        is PlaylistItem -> onPlaylistClick(item)
                                     }
                                 }
                             )
@@ -182,6 +173,7 @@ private fun HomeOnlineCard(
     val artistText = when (item) {
         is SongItem -> item.artists.firstOrNull()?.name ?: ""
         is AlbumItem -> item.artists?.firstOrNull()?.name ?: ""
+        is PlaylistItem -> item.author?.name ?: ""
         else -> ""
     }
 
