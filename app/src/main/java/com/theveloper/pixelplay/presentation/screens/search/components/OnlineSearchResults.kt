@@ -72,7 +72,7 @@ fun OnlineSearchResults(
         return
     }
 
-    if (items.isEmpty()) {
+    if (items.isEmpty() && !isSearching) {
         Box(
             modifier = modifier
                 .fillMaxSize()
@@ -80,10 +80,11 @@ fun OnlineSearchResults(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = "No online results found",
+                text = "Search YouTube Music above",
                 fontFamily = GoogleSansRounded,
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
             )
         }
         return
