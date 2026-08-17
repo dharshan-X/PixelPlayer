@@ -42,6 +42,19 @@ import java.io.IOException
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
+import com.theveloper.pixelplay.data.model.ONLINE_ALBUM_PREFIX
+import com.theveloper.pixelplay.data.model.ONLINE_PLAYLIST_PREFIX
+import com.theveloper.pixelplay.data.model.extractCleanOnlineId
+import com.theveloper.pixelplay.data.model.isOnlinePlaylistId
+import moe.rukamori.archivetune.innertube.YouTube
+import timber.log.Timber
+
+private data class OnlinePlaylistFetchResult(
+    val title: String,
+    val author: String,
+    val thumbnail: String?,
+    val songs: List<moe.rukamori.archivetune.innertube.models.SongItem>
+)
 
 data class PlaylistUiState(
     val playlists: List<Playlist> = emptyList(),
@@ -226,6 +239,78 @@ class PlaylistViewModel @Inject constructor(
                                 currentPlaylistSongs = emptyList()
                             )
                         }
+                    }
+                } else if (isOnlinePlaylistId(playlistId)) {
+                    val cleanId = extractCleanOnlineId(playlistId)
+                    val isAlbum = playlistId.startsWith(ONLINE_ALBUM_PREFIX) || cleanId.startsWith("MPRE")
+                    
+                    val fetchResult = withContext(Dispatchers.IO) {
+                        if (isAlbum) {
+                            val albumResult = YouTube.album(cleanId)
+                            val albumPage = albumResult.getOrThrow()
+                            OnlinePlaylistFetchResult(
+                                title = albumPage.album.title ?: "Unknown Album",
+                                author = albumPage.album.artists?.firstOrNull()?.name ?: "YouTube Music",
+                                thumbnail = albumPage.album.thumbnail,
+                                songs = albumPage.songs
+                            )
+                        } else {
+                            val playlistResult = YouTube.playlist(cleanId)
+                            val playlistPage = playlistResult.getOrThrow()
+                            OnlinePlaylistFetchResult(
+                                title = playlistPage.playlist.title ?: "Unknown Playlist",
+                                author = playlistPage.playlist.author?.name ?: "YouTube Music",
+                                thumbnail = playlistPage.playlist.thumbnail,
+                                songs = playlistPage.songs
+                            )
+                        }
+                    }
+
+                    val mappedSongs = fetchResult.songs.map { item ->
+                        val durationMs = (item.duration ?: 0) * 1000L
+                        val artistName = item.artists.firstOrNull()?.name ?: fetchResult.author
+                        Song(
+                            id = "yt_${item.id}",
+                            title = item.title,
+                            artist = artistName,
+                            artistId = -1L,
+                            album = fetchResult.title,
+                            albumId = -1L,
+                            albumArtist = artistName,
+                            path = "yt://${item.id}",
+                            contentUriString = "yt://${item.id}",
+                            albumArtUriString = item.thumbnail ?: fetchResult.thumbnail,
+                            duration = durationMs,
+                            mimeType = "audio/webm",
+                            bitrate = 160000,
+                            sampleRate = 44100
+                        )
+                    }
+
+                    if (mappedSongs.isNotEmpty()) {
+                        withContext(Dispatchers.IO) {
+                            runCatching {
+                                musicRepository.saveOnlineSongs(mappedSongs)
+                            }
+                        }
+                    }
+
+                    val onlinePlaylist = Playlist(
+                        id = playlistId,
+                        name = fetchResult.title,
+                        songIds = mappedSongs.map { it.id },
+                        coverImageUri = fetchResult.thumbnail,
+                        source = "YOUTUBE",
+                        isOnline = true
+                    )
+
+                    _uiState.update {
+                        it.copy(
+                            currentPlaylistDetails = onlinePlaylist,
+                            currentPlaylistSongs = mappedSongs,
+                            isLoading = false,
+                            playlistNotFound = false
+                        )
                     }
                 } else {
                     // Obtener la playlist de las preferencias del usuario
@@ -1224,4 +1309,32 @@ class PlaylistViewModel @Inject constructor(
             }
         }
     }
+
+    fun importOnlinePlaylistToLibrary(playlist: Playlist, songs: List<Song>, onComplete: ((String) -> Unit)? = null) {
+        viewModelScope.launch {
+            try {
+                val newPlaylistId = "user_pl_${System.currentTimeMillis()}"
+                val localPlaylist = Playlist(
+                    id = newPlaylistId,
+                    name = playlist.name,
+                    songIds = songs.map { it.id },
+                    coverImageUri = playlist.coverImageUri,
+                    isOnline = false
+                )
+                withContext(Dispatchers.IO) {
+                    musicRepository.saveOnlineSongs(songs)
+                    playlistPreferencesRepository.createPlaylist(
+                        name = localPlaylist.name,
+                        songIds = localPlaylist.songIds,
+                        coverImageUri = localPlaylist.coverImageUri,
+                        customId = newPlaylistId
+                    )
+                }
+                onComplete?.invoke(newPlaylistId)
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to import online playlist")
+            }
+        }
+    }
 }
+
