@@ -82,6 +82,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.theveloper.pixelplay.R
+import com.theveloper.pixelplay.data.model.ONLINE_ALBUM_PREFIX
+import com.theveloper.pixelplay.data.model.ONLINE_PLAYLIST_PREFIX
 import com.theveloper.pixelplay.data.model.Song
 import com.theveloper.pixelplay.data.model.StorageFilter
 import com.theveloper.pixelplay.data.preferences.CollagePattern
@@ -449,12 +451,9 @@ fun HomeScreen(
                                 )
                             },
                             onAlbumClick = { albumItem ->
-                                // TODO: Navigate to online album detail when implemented
-                                android.widget.Toast.makeText(
-                                    context,
-                                    "Album: ${albumItem.title}",
-                                    android.widget.Toast.LENGTH_SHORT
-                                ).show()
+                                navController.navigateSafely(
+                                    Screen.PlaylistDetail.createRoute("${ONLINE_ALBUM_PREFIX}${albumItem.id}")
+                                )
                             },
                             onArtistClick = { artistItem ->
                                 // TODO: Navigate to online artist detail when implemented
@@ -465,12 +464,9 @@ fun HomeScreen(
                                 ).show()
                             },
                             onPlaylistClick = { playlistItem ->
-                                // TODO: Navigate to online playlist detail when implemented
-                                android.widget.Toast.makeText(
-                                    context,
-                                    "Playlist: ${playlistItem.title}",
-                                    android.widget.Toast.LENGTH_SHORT
-                                ).show()
+                                navController.navigateSafely(
+                                    Screen.PlaylistDetail.createRoute("${ONLINE_PLAYLIST_PREFIX}${playlistItem.id}")
+                                )
                             },
                             onRefresh = {
                                 archiveTuneViewModel.loadHomeFeed()

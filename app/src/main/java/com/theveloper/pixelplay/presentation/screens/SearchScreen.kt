@@ -112,6 +112,8 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.theveloper.pixelplay.data.model.Album
 import com.theveloper.pixelplay.data.model.Genre
 import com.theveloper.pixelplay.data.model.Artist
+import com.theveloper.pixelplay.data.model.ONLINE_ALBUM_PREFIX
+import com.theveloper.pixelplay.data.model.ONLINE_PLAYLIST_PREFIX
 import com.theveloper.pixelplay.data.model.Playlist
 import com.theveloper.pixelplay.data.model.SearchFilterType
 import com.theveloper.pixelplay.data.model.SearchHistoryItem
@@ -729,6 +731,16 @@ fun SearchScreen(
                                             songItem = songItem,
                                             contextSongs = contextList,
                                             playerViewModel = playerViewModel
+                                        )
+                                    },
+                                    onAlbumClick = { albumItem ->
+                                        navController.navigateSafely(
+                                            Screen.PlaylistDetail.createRoute("${ONLINE_ALBUM_PREFIX}${albumItem.id}")
+                                        )
+                                    },
+                                    onPlaylistClick = { playlistItem ->
+                                        navController.navigateSafely(
+                                            Screen.PlaylistDetail.createRoute("${ONLINE_PLAYLIST_PREFIX}${playlistItem.id}")
                                         )
                                     },
                                     contentPadding = PaddingValues(

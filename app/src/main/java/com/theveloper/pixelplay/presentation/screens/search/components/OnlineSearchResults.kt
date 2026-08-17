@@ -54,6 +54,9 @@ fun OnlineSearchResults(
     resolvingSongId: String?,
     onSongClick: (SongItem, List<SongItem>) -> Unit,
     modifier: Modifier = Modifier,
+    onAlbumClick: ((AlbumItem) -> Unit)? = null,
+    onArtistClick: ((ArtistItem) -> Unit)? = null,
+    onPlaylistClick: ((PlaylistItem) -> Unit)? = null,
     listState: LazyListState = rememberLazyListState(),
     contentPadding: PaddingValues = PaddingValues(0.dp)
 ) {
@@ -108,13 +111,22 @@ fun OnlineSearchResults(
                     )
                 }
                 is AlbumItem -> {
-                    OnlineAlbumResultRow(item = item)
+                    OnlineAlbumResultRow(
+                        item = item,
+                        onClick = onAlbumClick?.let { { it(item) } }
+                    )
                 }
                 is ArtistItem -> {
-                    OnlineArtistResultRow(item = item)
+                    OnlineArtistResultRow(
+                        item = item,
+                        onClick = onArtistClick?.let { { it(item) } }
+                    )
                 }
                 is PlaylistItem -> {
-                    OnlinePlaylistResultRow(item = item)
+                    OnlinePlaylistResultRow(
+                        item = item,
+                        onClick = onPlaylistClick?.let { { it(item) } }
+                    )
                 }
             }
         }
@@ -194,11 +206,15 @@ private fun OnlineSongResultRow(
 }
 
 @Composable
-private fun OnlineAlbumResultRow(item: AlbumItem) {
+private fun OnlineAlbumResultRow(
+    item: AlbumItem,
+    onClick: (() -> Unit)? = null
+) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp)),
+            .clip(RoundedCornerShape(12.dp))
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow
     ) {
@@ -241,11 +257,15 @@ private fun OnlineAlbumResultRow(item: AlbumItem) {
 }
 
 @Composable
-private fun OnlineArtistResultRow(item: ArtistItem) {
+private fun OnlineArtistResultRow(
+    item: ArtistItem,
+    onClick: (() -> Unit)? = null
+) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp)),
+            .clip(RoundedCornerShape(12.dp))
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow
     ) {
@@ -288,11 +308,15 @@ private fun OnlineArtistResultRow(item: ArtistItem) {
 }
 
 @Composable
-private fun OnlinePlaylistResultRow(item: PlaylistItem) {
+private fun OnlinePlaylistResultRow(
+    item: PlaylistItem,
+    onClick: (() -> Unit)? = null
+) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp)),
+            .clip(RoundedCornerShape(12.dp))
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier),
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow
     ) {
