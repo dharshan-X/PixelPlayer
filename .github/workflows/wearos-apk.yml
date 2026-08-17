@@ -40,7 +40,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build Wear OS debug APK
-        run: ./gradlew :wear:assembleDebug --max-workers=2
+        run: ./gradlew :wear:assembleDebug --build-cache --max-workers=2
 
       - name: Upload Wear OS APK artifact
         uses: actions/upload-artifact@v4

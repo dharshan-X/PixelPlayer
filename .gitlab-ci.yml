@@ -1,12 +1,3 @@
-# This file is a template, and might need editing before it works on your project.
-# To contribute improvements to CI/CD templates, please follow the Development guide at:
-# https://docs.gitlab.com/development/cicd/templates/
-# This specific template is located at:
-# https://gitlab.com/gitlab-org/gitlab/-/blob/master/lib/gitlab/ci/templates/Android.gitlab-ci.yml
-
-# Read more about this script on this blog post https://about.gitlab.com/2018/10/24/setting-up-gitlab-ci-for-android-projects/, by Jason Lenny
-# If you are interested in using Android with FastLane for publishing take a look at the Android-Fastlane template.
-
 image: eclipse-temurin:21-jdk-jammy
 
 variables:
@@ -14,49 +5,65 @@ variables:
   ANDROID_BUILD_TOOLS: "37.0.0"
   ANDROID_SDK_TOOLS: "11076708"
   GIT_SUBMODULE_STRATEGY: recursive
-  GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dandroid.builder.sdkDownload=true -Dorg.gradle.jvmargs=\"-Xmx3072m -XX:MaxMetaspaceSize=1024m -XX:+UseParallelGC\""
+  GRADLE_USER_HOME: "$CI_PROJECT_DIR/.gradle"
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.caching=true -Dandroid.builder.sdkDownload=true -Dorg.gradle.jvmargs=\"-Xmx3072m -XX:MaxMetaspaceSize=1024m -XX:+UseParallelGC\""
 
-# Packages installation before running script
+# Cache Gradle dependencies, build cache, and Android SDK
+cache:
+  key:
+    files:
+      - gradle/wrapper/gradle-wrapper.properties
+      - build.gradle.kts
+      - app/build.gradle.kts
+    prefix: "$CI_COMMIT_REF_SLUG"
+  paths:
+    - .gradle/wrapper/
+    - .gradle/caches/
+    - android-sdk-root/
+
+# Packages installation & SDK setup before running scripts
 before_script:
-  - apt-get --quiet update --yes
-  - apt-get --quiet install --yes wget unzip git
-
-  # Setup path as android_home for moving/exporting the downloaded sdk into it
   - export ANDROID_HOME="${PWD}/android-sdk-root"
-  - install -d $ANDROID_HOME
-  - wget --no-verbose --output-document=$ANDROID_HOME/cmdline-tools.zip https://dl.google.com/android/repository/commandlinetools-linux-${ANDROID_SDK_TOOLS}_latest.zip
-  - unzip -q -d "$ANDROID_HOME/cmdline-tools" "$ANDROID_HOME/cmdline-tools.zip"
-  - mv -T "$ANDROID_HOME/cmdline-tools/cmdline-tools" "$ANDROID_HOME/cmdline-tools/tools"
   - export PATH=$PATH:$ANDROID_HOME/cmdline-tools/tools/bin:$ANDROID_HOME/platform-tools
 
-  # Check sdkmanager version and accept licenses
-  - sdkmanager --version
-  - yes | sdkmanager --licenses > /dev/null || true
-  - sdkmanager "platforms;android-${ANDROID_COMPILE_SDK}" "platforms;android-36" "platforms;android-35" || true
-  - sdkmanager "platform-tools" || true
-  - sdkmanager "build-tools;${ANDROID_BUILD_TOOLS}" "build-tools;35.0.0" || true
+  # Only download and install Android SDK if not already present in the cache
+  - |
+    if [ ! -d "$ANDROID_HOME/cmdline-tools/tools" ]; then
+      echo "=== Android SDK not found in cache. Performing initial installation... ==="
+      apt-get --quiet update --yes
+      apt-get --quiet install --yes wget unzip git
+      install -d $ANDROID_HOME
+      wget --no-verbose --output-document=$ANDROID_HOME/cmdline-tools.zip https://dl.google.com/android/repository/commandlinetools-linux-${ANDROID_SDK_TOOLS}_latest.zip
+      unzip -q -d "$ANDROID_HOME/cmdline-tools" "$ANDROID_HOME/cmdline-tools.zip"
+      mv -T "$ANDROID_HOME/cmdline-tools/cmdline-tools" "$ANDROID_HOME/cmdline-tools/tools"
+      sdkmanager --version
+      yes | sdkmanager --licenses > /dev/null || true
+      sdkmanager "platforms;android-${ANDROID_COMPILE_SDK}" "platforms;android-36" "platforms;android-35" || true
+      sdkmanager "platform-tools" || true
+      sdkmanager "build-tools;${ANDROID_BUILD_TOOLS}" "build-tools;35.0.0" || true
+    else
+      echo "=== Android SDK found in cache! Skipping SDK download. ==="
+    fi
 
   - chmod +x ./gradlew
-
 
 # Build Phone Debug APK
 assembleDebug:
   interruptible: true
   stage: build
   script:
-    - ./gradlew :app:assembleDebug -Ppixelplay.enableAbiSplits=true --max-workers=2
+    - ./gradlew :app:assembleDebug -Ppixelplay.enableAbiSplits=true --build-cache --max-workers=2
   artifacts:
     paths:
       - app/build/outputs/apk/debug/
     expire_in: 7 days
 
-
-#Build Phone Release Apk
+# Build Phone Release APK
 assembleRelease:
   interruptible: true
   stage: build
   script:
-    - ./gradlew :app:assembleRelease -Ppixelplay.enableAbiSplits=true --max-workers=2
+    - ./gradlew :app:assembleRelease -Ppixelplay.enableAbiSplits=true --build-cache --max-workers=2
   artifacts:
     paths:
       - app/build/outputs/apk/release/
@@ -68,5 +75,4 @@ debugTests:
   interruptible: true
   stage: test
   script:
-    - ./gradlew :app:testDebug --max-workers=2
-
+    - ./gradlew :app:testDebug --build-cache --max-workers=2
