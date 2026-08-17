@@ -1,5 +1,6 @@
 package com.theveloper.pixelplay.presentation.screens
 
+import android.widget.Toast
 import com.theveloper.pixelplay.presentation.navigation.navigateSafely
 import com.theveloper.pixelplay.presentation.navigation.navigateSafelyReplacing
 
@@ -186,6 +187,7 @@ fun PlaylistDetailScreen(
     val toastPlayingNext = stringResource(R.string.library_toast_playing_next)
     val currentPlaylist = uiState.currentPlaylistDetails
     val isFolderPlaylist = currentPlaylist?.id?.startsWith(FOLDER_PLAYLIST_PREFIX) == true
+    val isOnlinePlaylist = currentPlaylist?.isOnline == true
     val songsInPlaylist = uiState.currentPlaylistSongs
 
     LaunchedEffect(playlistId) {
@@ -245,14 +247,14 @@ fun PlaylistDetailScreen(
         }
     )
 
-    LaunchedEffect(reorderableState.isAnyItemDragging, isFolderPlaylist) {
-        if (!isFolderPlaylist && !reorderableState.isAnyItemDragging && lastMovedFrom != null && lastMovedTo != null) {
+    LaunchedEffect(reorderableState.isAnyItemDragging, isFolderPlaylist, isOnlinePlaylist) {
+        if (!isFolderPlaylist && !isOnlinePlaylist && !reorderableState.isAnyItemDragging && lastMovedFrom != null && lastMovedTo != null) {
             currentPlaylist?.let {
                 playlistViewModel.reorderSongsInPlaylist(it.id, lastMovedFrom!!, lastMovedTo!!)
             }
             lastMovedFrom = null
             lastMovedTo = null
-        } else if (isFolderPlaylist && !reorderableState.isAnyItemDragging) {
+        } else if ((isFolderPlaylist || isOnlinePlaylist) && !reorderableState.isAnyItemDragging) {
             lastMovedFrom = null
             lastMovedTo = null
         }
@@ -279,16 +281,35 @@ fun PlaylistDetailScreen(
                     containerColor = Color.Transparent
                 ),
                 subtitle = {
-                    Text(
+                    Row(
                         modifier = Modifier.padding(start = 8.dp),
-                        text = stringResource(
-                            R.string.playlist_song_duration_line,
-                            formatSongCount(songsInPlaylist.size),
-                            formatTotalDuration(songsInPlaylist)
-                        ),
-                        style = MaterialTheme.typography.labelMedium.copy(fontFamily = GoogleSansRounded),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        if (isOnlinePlaylist) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = "YouTube Music",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontFamily = GoogleSansRounded),
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
+                        Text(
+                            text = stringResource(
+                                R.string.playlist_song_duration_line,
+                                formatSongCount(songsInPlaylist.size),
+                                formatTotalDuration(songsInPlaylist)
+                            ),
+                            style = MaterialTheme.typography.labelMedium.copy(fontFamily = GoogleSansRounded),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 },
                 navigationIcon = {
                     FilledTonalIconButton(
@@ -446,7 +467,48 @@ fun PlaylistDetailScreen(
                     }
                 }
 
-                if (!isFolderPlaylist) {
+                if (isOnlinePlaylist) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 20.dp, end = 20.dp, bottom = 8.dp, top = 2.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Button(
+                            onClick = {
+                                currentPlaylist?.let { pl ->
+                                    playlistViewModel.importOnlinePlaylistToLibrary(pl, songsInPlaylist) { _ ->
+                                        Toast.makeText(context, "Saved to your library", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            },
+                            shape = CircleShape,
+                            contentPadding = PaddingValues(horizontal = 16.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                            ),
+                            modifier = Modifier
+                                .height(actionButtonsHeight)
+                                .fillMaxWidth()
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.rounded_playlist_add_24),
+                                contentDescription = "Save to Library",
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                modifier = Modifier.padding(end = 4.dp),
+                                text = "Save to Library",
+                                style = MaterialTheme.typography.labelLarge,
+                                maxLines = 1,
+                                softWrap = false
+                            )
+                        }
+                    }
+                } else if (!isFolderPlaylist) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -668,6 +730,8 @@ fun PlaylistDetailScreen(
                             Text(playlistEmptyTitle, style = MaterialTheme.typography.titleMedium)
                             val emptyMessage = if (isFolderPlaylist) {
                                 playlistEmptyFolder
+                            } else if (isOnlinePlaylist) {
+                                "This online playlist has no tracks"
                             } else {
                                 playlistEmptyAddHint
                             }
@@ -743,7 +807,7 @@ fun PlaylistDetailScreen(
                                         isPlaying = playerStableState.isPlaying,
                                         isDragging = isDragging,
                                         onRemoveClick = {
-                                            if (!isFolderPlaylist) {
+                                            if (!isFolderPlaylist && !isOnlinePlaylist) {
                                                 currentPlaylist.let {
                                                     playlistViewModel.removeSongFromPlaylist(it.id, song.id)
                                                 }
@@ -804,7 +868,7 @@ fun PlaylistDetailScreen(
         }
     }
 
-    if (showAddSongsSheet && currentPlaylist != null && !isFolderPlaylist) {
+    if (showAddSongsSheet && currentPlaylist != null && !isFolderPlaylist && !isOnlinePlaylist) {
         SongPickerBottomSheet(
             initiallySelectedSongIds = currentPlaylist.songIds.toSet(),
             onDismiss = { showAddSongsSheet = false },
@@ -852,39 +916,54 @@ fun PlaylistDetailScreen(
                         )
                     }
                 }
-                PlaylistActionItem(
-                    icon = painterResource(R.drawable.rounded_edit_24),
-                    label = editPlaylistLabel,
-                    onClick = {
-                        showPlaylistOptionsSheet = false
-                        showEditPlaylistDialog = true
-                    }
-                )
-                PlaylistActionItem(
-                    icon = painterResource(R.drawable.rounded_delete_24),
-                    label = deletePlaylistLabel,
-                    onClick = {
-                        showPlaylistOptionsSheet = false
-                        showDeleteConfirmation = true
-                    }
-                )
-                PlaylistActionItem(
-                    icon = painterResource(R.drawable.outline_graph_1_24),
-                    label = setDefaultTransitionLabel,
-                    onClick = {
-                        showPlaylistOptionsSheet = false
-                        navController.navigateSafely(Screen.EditTransition.createRoute(playlistId))
-                    }
-                )
-                PlaylistActionItem(
-                    icon = painterResource(R.drawable.rounded_attach_file_24),
-                    label = exportPlaylistLabel,
-                    onClick = {
-                        showPlaylistOptionsSheet = false
-                        val sanitizedName = PlaylistViewModel.sanitizeFileName(currentPlaylist?.name ?: fallbackPlaylistName)
-                        m3uExportLauncher.launch("$sanitizedName.m3u")
-                    }
-                )
+                if (isOnlinePlaylist) {
+                    PlaylistActionItem(
+                        icon = painterResource(R.drawable.rounded_playlist_add_24),
+                        label = "Save to Library",
+                        onClick = {
+                            showPlaylistOptionsSheet = false
+                            currentPlaylist?.let { pl ->
+                                playlistViewModel.importOnlinePlaylistToLibrary(pl, songsInPlaylist) { _ ->
+                                    Toast.makeText(context, "Saved to your library", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
+                    )
+                } else {
+                    PlaylistActionItem(
+                        icon = painterResource(R.drawable.rounded_edit_24),
+                        label = editPlaylistLabel,
+                        onClick = {
+                            showPlaylistOptionsSheet = false
+                            showEditPlaylistDialog = true
+                        }
+                    )
+                    PlaylistActionItem(
+                        icon = painterResource(R.drawable.rounded_delete_24),
+                        label = deletePlaylistLabel,
+                        onClick = {
+                            showPlaylistOptionsSheet = false
+                            showDeleteConfirmation = true
+                        }
+                    )
+                    PlaylistActionItem(
+                        icon = painterResource(R.drawable.outline_graph_1_24),
+                        label = setDefaultTransitionLabel,
+                        onClick = {
+                            showPlaylistOptionsSheet = false
+                            navController.navigateSafely(Screen.EditTransition.createRoute(playlistId))
+                        }
+                    )
+                    PlaylistActionItem(
+                        icon = painterResource(R.drawable.rounded_attach_file_24),
+                        label = exportPlaylistLabel,
+                        onClick = {
+                            showPlaylistOptionsSheet = false
+                            val sanitizedName = PlaylistViewModel.sanitizeFileName(currentPlaylist?.name ?: fallbackPlaylistName)
+                            m3uExportLauncher.launch("$sanitizedName.m3u")
+                        }
+                    )
+                }
             }
         }
     }
