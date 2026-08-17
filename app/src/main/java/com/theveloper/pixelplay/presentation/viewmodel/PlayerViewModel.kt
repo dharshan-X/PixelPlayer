@@ -2332,6 +2332,8 @@ class PlayerViewModel @Inject constructor(
 
     fun addSongToQueue(song: Song) = playbackDispatchStateHolder.addSongToQueue(song)
 
+    fun addSongsToQueue(songs: List<Song>) = playbackDispatchStateHolder.addSongsToQueue(songs)
+
     fun addSongNextToQueue(song: Song) = playbackDispatchStateHolder.addSongNextToQueue(song)
 
     // =====================================================

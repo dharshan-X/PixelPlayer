@@ -656,6 +656,7 @@ class MediaControllerSyncStateHolder @Inject constructor(
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                 if (isRemoteSessionControllingPlayback()) return
                 playbackStateHolder.onPlaybackOccurrenceTransition(mediaItem?.mediaId)
+                playbackDispatchStateHolder.checkAndTriggerAutoQueue(mediaItem?.mediaId ?: "")
                 preparePlaybackAudioMetadataForMedia(mediaItem?.mediaId)
                 transitionSchedulerJob?.cancel()
                 lyricsStateHolder.cancelLoading()

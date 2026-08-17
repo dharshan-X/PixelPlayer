@@ -11,6 +11,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaController
 import com.google.android.gms.cast.framework.media.RemoteMediaClient
 import com.theveloper.pixelplay.R
+import com.theveloper.pixelplay.data.archivetune.ArchiveTuneRadioManager
 import com.theveloper.pixelplay.data.service.cast.CastRemotePlaybackState
 import com.theveloper.pixelplay.data.model.Song
 import com.theveloper.pixelplay.data.preferences.UserPreferencesRepository
@@ -94,6 +95,7 @@ class PlaybackDispatchStateHolder @Inject constructor(
     private val castTransferStateHolder: CastTransferStateHolder,
     private val connectivityStateHolder: ConnectivityStateHolder,
     private val themeStateHolder: ThemeStateHolder,
+    private val archiveTuneRadioManager: ArchiveTuneRadioManager,
     @param:ApplicationContext private val context: Context,
 ) {
 
@@ -111,6 +113,8 @@ class PlaybackDispatchStateHolder @Inject constructor(
     private var directPlaybackToken: Long = 0L
     private var pendingQueueSegmentsJob: Job? = null
     private var remoteQueueLoadJob: Job? = null
+    private var autoQueueJob: Job? = null
+    private var lastAutoQueueSongId: String? = null
 
     // Playback action parked until the MediaController finishes connecting.
     private var pendingPlaybackAction: (() -> Unit)? = null
@@ -123,6 +127,7 @@ class PlaybackDispatchStateHolder @Inject constructor(
 
     fun onCleared() {
         remoteQueueLoadJob?.cancel()
+        autoQueueJob?.cancel()
     }
 
     fun showAndPlaySongFromLibrary(
@@ -986,6 +991,15 @@ class PlaybackDispatchStateHolder @Inject constructor(
         }
     }
 
+    fun addSongsToQueue(songs: List<Song>) {
+        if (songs.isEmpty()) return
+        cb.getController()?.let { controller ->
+            val mediaItems = songs.map { buildPlaybackMediaItem(it) }
+            controller.addMediaItems(mediaItems)
+            // Queue UI is synced via onTimelineChanged listener
+        }
+    }
+
     fun addSongNextToQueue(song: Song) {
         cb.getController()?.let { controller ->
             val mediaItem = buildPlaybackMediaItem(song)
@@ -998,6 +1012,57 @@ class PlaybackDispatchStateHolder @Inject constructor(
 
             controller.addMediaItem(insertionIndex, mediaItem)
             // Queue UI is synced via onTimelineChanged listener
+        }
+    }
+
+    fun checkAndTriggerAutoQueue(currentSongId: String) {
+        if (currentSongId.isBlank()) return
+
+        val currentSong = playbackStateHolder.stablePlayerState.value.currentSong
+        val isOnline = currentSongId.startsWith("yt_") ||
+            currentSongId.startsWith("yt://") ||
+            currentSong?.let {
+                it.id.startsWith("yt_") ||
+                it.contentUriString.startsWith("yt://") ||
+                it.contentUriString.startsWith("archivetune://") ||
+                it.contentUriString.contains("googlevideo.com")
+            } == true
+
+        if (!isOnline) return
+
+        val controller = cb.getController() ?: return
+        if (!controller.isConnected) return
+        if (controller.mediaItemCount <= 0 || controller.currentMediaItemIndex == C.INDEX_UNSET) return
+
+        val remaining = controller.mediaItemCount - controller.currentMediaItemIndex - 1
+        if (remaining <= 2) {
+            if (lastAutoQueueSongId == currentSongId || autoQueueJob?.isActive == true) {
+                return
+            }
+            lastAutoQueueSongId = currentSongId
+
+            val currentQueueIds = buildSet {
+                addAll(cb.getUiState().currentPlaybackQueue.map { it.id })
+                for (i in 0 until controller.mediaItemCount) {
+                    runCatching { controller.getMediaItemAt(i).mediaId }.getOrNull()?.let { add(it) }
+                }
+            }
+
+            autoQueueJob = cb.scope.launch {
+                val (newSongs, _) = archiveTuneRadioManager.fetchRadioQueue(currentSongId, currentQueueIds)
+                if (newSongs.isEmpty()) return@launch
+
+                withContext(Dispatchers.Main.immediate) {
+                    val ctrl = cb.getController() ?: return@withContext
+                    val newMediaItems = newSongs.map { buildPlaybackMediaItem(it) }
+                    ctrl.addMediaItems(newMediaItems)
+                    cb.updateUiState { state ->
+                        state.copy(
+                            currentPlaybackQueue = (state.currentPlaybackQueue + newSongs).toPlaybackQueue()
+                        )
+                    }
+                }
+            }
         }
     }
 
