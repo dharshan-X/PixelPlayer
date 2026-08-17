@@ -709,7 +709,7 @@ fun SearchScreen(
                                                 fontFamily = GoogleSansRounded,
                                                 modifier = Modifier.weight(1f)
                                             )
-                                            IconButton(onClick = { archiveTuneViewModel.performSearch() }) {
+                                            IconButton(onClick = { archiveTuneViewModel.performSearch(debounceMillis = 0L) }) {
                                                 Icon(
                                                     imageVector = Icons.Rounded.Refresh,
                                                     contentDescription = "Retry",

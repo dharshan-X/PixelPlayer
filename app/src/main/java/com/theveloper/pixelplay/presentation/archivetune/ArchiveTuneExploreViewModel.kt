@@ -9,6 +9,8 @@ import com.theveloper.pixelplay.data.model.Song
 import com.theveloper.pixelplay.presentation.viewmodel.PlayerViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -75,10 +77,14 @@ class ArchiveTuneExploreViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             isLoadingHome = false,
-                            homeSections = homePage.sections.filter { s -> s.items.isNotEmpty() }
+                            homeSections = homePage.sections.filter { s -> s.items.isNotEmpty() },
+                            errorMessage = null
                         )
                     }
                 }.onFailure { err ->
+                    if (err is CancellationException || err.message?.contains("cancel", ignoreCase = true) == true) {
+                        return@launch
+                    }
                     Timber.e(err, "Failed to load ArchiveTune home feed")
                     _uiState.update {
                         it.copy(
@@ -88,6 +94,9 @@ class ArchiveTuneExploreViewModel @Inject constructor(
                     }
                 }
             } catch (e: Exception) {
+                if (e is CancellationException || e.message?.contains("cancel", ignoreCase = true) == true) {
+                    return@launch
+                }
                 Timber.e(e, "Exception loading ArchiveTune home feed")
                 _uiState.update {
                     it.copy(
@@ -103,7 +112,7 @@ class ArchiveTuneExploreViewModel @Inject constructor(
         _uiState.update { it.copy(searchQuery = newQuery) }
         if (newQuery.isBlank()) {
             searchJob?.cancel()
-            _uiState.update { it.copy(isSearching = false, searchResults = emptyList()) }
+            _uiState.update { it.copy(isSearching = false, searchResults = emptyList(), errorMessage = null) }
         }
     }
 
@@ -111,19 +120,26 @@ class ArchiveTuneExploreViewModel @Inject constructor(
         _uiState.update { it.copy(activeCategory = category) }
         val currentQuery = _uiState.value.searchQuery
         if (currentQuery.isNotBlank()) {
-            performSearch(currentQuery, category)
+            performSearch(currentQuery, category, debounceMillis = 0L)
         }
     }
 
     fun performSearch(
         query: String = _uiState.value.searchQuery,
-        category: ArchiveTuneSearchCategory = _uiState.value.activeCategory
+        category: ArchiveTuneSearchCategory = _uiState.value.activeCategory,
+        debounceMillis: Long = 350L
     ) {
         val trimmed = query.trim()
-        if (trimmed.isBlank()) return
+        if (trimmed.isBlank()) {
+            _uiState.update { it.copy(isSearching = false, searchResults = emptyList(), errorMessage = null) }
+            return
+        }
 
         searchJob?.cancel()
         searchJob = viewModelScope.launch {
+            if (debounceMillis > 0) {
+                delay(debounceMillis)
+            }
             _uiState.update { it.copy(isSearching = true, errorMessage = null) }
             try {
                 val filter = category.filter
@@ -138,10 +154,14 @@ class ArchiveTuneExploreViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             isSearching = false,
-                            searchResults = result.items
+                            searchResults = result.items,
+                            errorMessage = null
                         )
                     }
                 }.onFailure { err ->
+                    if (err is CancellationException || err.message?.contains("cancel", ignoreCase = true) == true) {
+                        return@launch
+                    }
                     Timber.e(err, "Search failed for query: $trimmed")
                     _uiState.update {
                         it.copy(
@@ -151,6 +171,9 @@ class ArchiveTuneExploreViewModel @Inject constructor(
                     }
                 }
             } catch (e: Exception) {
+                if (e is CancellationException || e.message?.contains("cancel", ignoreCase = true) == true) {
+                    return@launch
+                }
                 Timber.e(e, "Search exception for query: $trimmed")
                 _uiState.update {
                     it.copy(
