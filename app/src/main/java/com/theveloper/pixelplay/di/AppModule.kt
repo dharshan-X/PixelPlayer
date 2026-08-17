@@ -274,16 +274,32 @@ object AppModule {
                 val request = chain.request()
                 val url = request.url.toString()
 
-                // Add Referer header for QQ Music images
-                val newRequest = if (url.contains("y.qq.com")) {
-                    request.newBuilder()
-                        .header("Referer", "https://y.qq.com/")
-                        .build()
-                } else {
-                    request
+                // Upgrade low-res Google/YouTube Music thumbnail URLs to 1080p HD
+                var targetUrl = url
+                if (targetUrl.contains("googleusercontent.com") || targetUrl.contains("ggpht.com")) {
+                    targetUrl = targetUrl.replace(Regex("=w\\d+-h\\d+[^/?#]*"), "=w1080-h1080-l90-rj")
+                    if (!targetUrl.contains("=w1080-h1080")) {
+                        targetUrl = targetUrl.replace(Regex("=s\\d+[^/?#]*"), "=s1080-l90-rj")
+                    }
+                } else if (targetUrl.contains("ytimg.com") || targetUrl.contains("youtube.com")) {
+                    targetUrl = targetUrl
+                        .replace("/default.jpg", "/maxresdefault.jpg")
+                        .replace("/hqdefault.jpg", "/maxresdefault.jpg")
+                        .replace("/mqdefault.jpg", "/maxresdefault.jpg")
+                        .replace("/sddefault.jpg", "/maxresdefault.jpg")
                 }
 
-                chain.proceed(newRequest)
+                val requestBuilder = request.newBuilder()
+                if (targetUrl != url) {
+                    requestBuilder.url(targetUrl)
+                }
+
+                // Add Referer header for QQ Music images
+                if (url.contains("y.qq.com")) {
+                    requestBuilder.header("Referer", "https://y.qq.com/")
+                }
+
+                chain.proceed(requestBuilder.build())
             }
             .build()
 

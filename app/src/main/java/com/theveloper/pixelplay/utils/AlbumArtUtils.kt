@@ -93,6 +93,29 @@ object AlbumArtUtils {
     }
 
     /**
+     * Upgrades low-resolution YouTube Music / Google UserContent thumbnail URLs to 1080p HD.
+     */
+    fun upgradeThumbnailUrl(url: String?, targetDimension: Int = 1080): String? {
+        if (url.isNullOrBlank()) return null
+        var cleanUrl = if (url.startsWith("//")) "https:$url" else url
+        if (cleanUrl.contains("googleusercontent.com") || cleanUrl.contains("ggpht.com")) {
+            cleanUrl = cleanUrl.replace(Regex("=w\\d+-h\\d+[^/?#]*"), "=w${targetDimension}-h${targetDimension}-l90-rj")
+            if (!cleanUrl.contains("=w$targetDimension-h$targetDimension")) {
+                cleanUrl = cleanUrl.replace(Regex("=s\\d+[^/?#]*"), "=s${targetDimension}-l90-rj")
+            }
+            return cleanUrl
+        }
+        if (cleanUrl.contains("ytimg.com") || cleanUrl.contains("youtube.com")) {
+            return cleanUrl
+                .replace("/default.jpg", "/maxresdefault.jpg")
+                .replace("/hqdefault.jpg", "/maxresdefault.jpg")
+                .replace("/mqdefault.jpg", "/maxresdefault.jpg")
+                .replace("/sddefault.jpg", "/maxresdefault.jpg")
+        }
+        return cleanUrl
+    }
+
+    /**
      * Lightweight scan-time artwork resolution.
      *
      * Full embedded-art extraction can allocate large ByteArrays per song. During a library scan
