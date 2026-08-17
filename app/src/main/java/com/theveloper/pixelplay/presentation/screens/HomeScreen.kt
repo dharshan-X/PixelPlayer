@@ -448,8 +448,32 @@ fun HomeScreen(
                                     playerViewModel = playerViewModel
                                 )
                             },
-                            onNavigateToExplore = {
-                                navController.navigateSafely(Screen.ArchiveTuneExplore.route)
+                            onAlbumClick = { albumItem ->
+                                // TODO: Navigate to online album detail when implemented
+                                android.widget.Toast.makeText(
+                                    context,
+                                    "Album: ${albumItem.title}",
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
+                            },
+                            onArtistClick = { artistItem ->
+                                // TODO: Navigate to online artist detail when implemented
+                                android.widget.Toast.makeText(
+                                    context,
+                                    "Artist: ${artistItem.title}",
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
+                            },
+                            onPlaylistClick = { playlistItem ->
+                                // TODO: Navigate to online playlist detail when implemented
+                                android.widget.Toast.makeText(
+                                    context,
+                                    "Playlist: ${playlistItem.title}",
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
+                            },
+                            onRefresh = {
+                                archiveTuneViewModel.loadHomeFeed()
                             }
                         )
                     }
