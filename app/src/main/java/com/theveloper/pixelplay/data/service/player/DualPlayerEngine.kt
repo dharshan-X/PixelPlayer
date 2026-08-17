@@ -780,6 +780,15 @@ class DualPlayerEngine @Inject constructor(
         resolvedUriCache.put(uriString, resolvedUri)
     }
 
+    fun invalidateStreamCache(songId: String) {
+        val cleanId = songId.removePrefix("yt://").removePrefix("yt_").removePrefix("archivetune://")
+        resolvedUriCache.remove(songId)
+        resolvedUriCache.remove("yt://$cleanId")
+        resolvedUriCache.remove("yt_$cleanId")
+        resolvedUriCache.remove(cleanId)
+        moe.rukamori.archivetune.utils.YTPlayerUtils.markStreamClientFailed(cleanId, null, 403)
+    }
+
     // Whether the OS classifies this as a low-RAM device. Used to cap the player's max
     // prefetch depth so hi-res/lossless buffering (and the second player during a crossfade)
     // can't balloon peak memory on constrained hardware. Cached: it never changes at runtime.

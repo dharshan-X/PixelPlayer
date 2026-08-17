@@ -1456,8 +1456,36 @@ class MusicService : MediaLibraryService() {
 
         override fun onPlayerError(error: PlaybackException) {
             Timber.tag(TAG).e(error, "Error en el reproductor: ")
+            val currentMediaItem = mediaSession?.player?.currentMediaItem
+            val mediaId = currentMediaItem?.mediaId.orEmpty()
+            val isOnlineTrack = mediaId.startsWith("yt_") || mediaId.startsWith("yt://") || mediaId.startsWith("archivetune://")
+
+            if (isOnlineTrack && (error.errorCode in listOf(
+                    PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS,
+                    PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+                    PlaybackException.ERROR_CODE_IO_CLEARTEXT_NOT_PERMITTED,
+                    PlaybackException.ERROR_CODE_IO_UNSPECIFIED,
+                    PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED
+                ))
+            ) {
+                Timber.tag(TAG).w("Attempting automatic stream recovery for online track: %s", mediaId)
+                serviceScope.launch(Dispatchers.Main.immediate) {
+                    val currentPos = mediaSession?.player?.currentPosition ?: 0L
+                    engine.invalidateStreamCache(mediaId)
+                    val newMediaItem = engine.resolveMediaItem(currentMediaItem!!)
+                    val player = mediaSession?.player ?: engine.masterPlayer
+                    val currentIndex = player.currentMediaItemIndex
+                    if (currentIndex != C.INDEX_UNSET && currentIndex < player.mediaItemCount) {
+                        player.replaceMediaItem(currentIndex, newMediaItem)
+                        player.seekTo(currentIndex, currentPos)
+                        player.prepare()
+                        player.play()
+                        return@launch
+                    }
+                }
+            }
+
             serviceScope.launch {
-                val currentMediaItem = mediaSession?.player?.currentMediaItem
                 val trackTitle = currentMediaItem?.mediaMetadata?.title?.toString()
                     ?: currentMediaItem?.mediaId
                     ?: getString(R.string.common_unknown_track)

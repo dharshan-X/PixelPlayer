@@ -16,6 +16,36 @@ class ArchiveTuneStreamResolver @Inject constructor(
     private val extractionManager: StreamingExtractionManager,
     private val tokenRepository: BearerTokenRepository
 ) {
+    private val probeOkHttpClient: okhttp3.OkHttpClient by lazy {
+        okhttp3.OkHttpClient.Builder()
+            .connectTimeout(3, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(3, java.util.concurrent.TimeUnit.SECONDS)
+            .followRedirects(true)
+            .followSslRedirects(true)
+            .build()
+    }
+
+    private fun verifyStreamPlayability(
+        streamUrl: String,
+        userAgent: String,
+        origin: String?,
+        referer: String?
+    ): Boolean {
+        return runCatching {
+            val reqBuilder = okhttp3.Request.Builder()
+                .url(streamUrl)
+                .header("User-Agent", userAgent)
+                .header("Range", "bytes=0-0")
+            origin?.let { reqBuilder.header("Origin", it) }
+            referer?.let { reqBuilder.header("Referer", it) }
+
+            probeOkHttpClient.newCall(reqBuilder.build()).execute().use { response ->
+                val code = response.code
+                code in 200..299 || code == 302 || code == 304
+            }
+        }.getOrDefault(false)
+    }
+
     suspend fun resolveStream(
         context: Context,
         videoId: String,
@@ -43,6 +73,8 @@ class ArchiveTuneStreamResolver @Inject constructor(
         val preferredClients = listOf(
             PlayerStreamClient.ANDROID_VR,
             PlayerStreamClient.WEB_REMIX,
+            PlayerStreamClient.IOS,
+            PlayerStreamClient.ANDROID_MUSIC,
             PlayerStreamClient.TVHTML5
         )
 
@@ -59,17 +91,33 @@ class ArchiveTuneStreamResolver @Inject constructor(
             if (nativeResult.isSuccess) {
                 val data = nativeResult.getOrThrow()
                 val requestProfile = StreamClientUtils.resolveRequestProfile(data.streamUrl)
-                return@runCatching ArchiveTuneStreamResult(
-                    videoId = videoId,
+
+                val isPlayable = verifyStreamPlayability(
                     streamUrl = data.streamUrl,
-                    mimeType = data.format.mimeType.substringBefore(';').trim(),
-                    bitrate = data.format.bitrate,
-                    expiresInSeconds = data.streamExpiresInSeconds,
-                    clientName = requestProfile.resolvedClientFamily,
                     userAgent = requestProfile.userAgent,
                     origin = requestProfile.origin,
                     referer = requestProfile.referer
                 )
+
+                if (isPlayable) {
+                    return@runCatching ArchiveTuneStreamResult(
+                        videoId = videoId,
+                        streamUrl = data.streamUrl,
+                        mimeType = data.format.mimeType.substringBefore(';').trim(),
+                        bitrate = data.format.bitrate,
+                        expiresInSeconds = data.streamExpiresInSeconds,
+                        clientName = requestProfile.resolvedClientFamily,
+                        userAgent = requestProfile.userAgent,
+                        origin = requestProfile.origin,
+                        referer = requestProfile.referer
+                    )
+                } else {
+                    timber.log.Timber.tag("ArchiveTuneStreamResolver").w(
+                        "Stream URL for client=%s rejected by CDN probe (HTTP 403/4xx), probing next client...",
+                        client
+                    )
+                    YTPlayerUtils.markPreferredClientFailed(videoId, client, 403)
+                }
             } else {
                 lastException = nativeResult.exceptionOrNull()
                 timber.log.Timber.tag("ArchiveTuneStreamResolver").w(

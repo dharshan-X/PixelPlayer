@@ -243,7 +243,7 @@ object StreamClientUtils {
             }
 
             else -> {
-                YouTubeClient.ANDROID_VR_1_65_10
+                YouTubeClient.WEB_REMIX
             }
         }
     }
