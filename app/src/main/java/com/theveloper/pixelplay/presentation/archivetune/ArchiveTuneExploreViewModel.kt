@@ -13,6 +13,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,6 +28,7 @@ import moe.rukamori.archivetune.innertube.models.PlaylistItem
 import moe.rukamori.archivetune.innertube.models.SongItem
 import moe.rukamori.archivetune.innertube.models.YTItem
 import moe.rukamori.archivetune.innertube.pages.HomePage
+import moe.rukamori.archivetune.innertube.pages.SearchResult
 import android.net.Uri
 import com.theveloper.pixelplay.data.service.player.DualPlayerEngine
 import com.theveloper.pixelplay.data.repository.MusicRepository
@@ -170,12 +172,54 @@ class ArchiveTuneExploreViewModel @Inject constructor(
                 )
             }
             try {
-                val filter = category.filter
-                val searchResult = withContext(Dispatchers.IO) {
-                    if (filter != null) {
-                        YouTube.search(trimmed, filter)
-                    } else {
-                        YouTube.search(trimmed, YouTube.SearchFilter.FILTER_SONG)
+                val searchResult: Result<SearchResult> = withContext(Dispatchers.IO) {
+                    when (category) {
+                        ArchiveTuneSearchCategory.PLAYLISTS -> {
+                            val communityDeferred = async {
+                                YouTube.search(trimmed, YouTube.SearchFilter.FILTER_COMMUNITY_PLAYLIST)
+                            }
+                            val featuredDeferred = async {
+                                YouTube.search(trimmed, YouTube.SearchFilter.FILTER_FEATURED_PLAYLIST)
+                            }
+
+                            val communityRes = communityDeferred.await()
+                            val featuredRes = featuredDeferred.await()
+
+                            val communityItems = communityRes.getOrNull()?.items.orEmpty().filterIsInstance<PlaylistItem>()
+                            val featuredItems = featuredRes.getOrNull()?.items.orEmpty().filterIsInstance<PlaylistItem>()
+
+                            val combinedItems = (communityItems + featuredItems).distinctBy { it.id }
+                            val continuation = communityRes.getOrNull()?.continuation ?: featuredRes.getOrNull()?.continuation
+
+                            if (communityRes.isFailure && featuredRes.isFailure && combinedItems.isEmpty()) {
+                                val error = communityRes.exceptionOrNull()
+                                    ?: featuredRes.exceptionOrNull()
+                                    ?: Exception("Failed to search playlists")
+                                Result.failure(error)
+                            } else {
+                                Result.success(SearchResult(items = combinedItems, continuation = continuation))
+                            }
+                        }
+                        ArchiveTuneSearchCategory.SONGS -> {
+                            YouTube.search(trimmed, YouTube.SearchFilter.FILTER_SONG).map { res ->
+                                res.copy(items = res.items.filterIsInstance<SongItem>().distinctBy { it.id })
+                            }
+                        }
+                        ArchiveTuneSearchCategory.ALBUMS -> {
+                            YouTube.search(trimmed, YouTube.SearchFilter.FILTER_ALBUM).map { res ->
+                                res.copy(items = res.items.filterIsInstance<AlbumItem>().distinctBy { it.id })
+                            }
+                        }
+                        ArchiveTuneSearchCategory.ARTISTS -> {
+                            YouTube.search(trimmed, YouTube.SearchFilter.FILTER_ARTIST).map { res ->
+                                res.copy(items = res.items.filterIsInstance<ArtistItem>().distinctBy { it.id })
+                            }
+                        }
+                        ArchiveTuneSearchCategory.ALL -> {
+                            YouTube.search(trimmed, YouTube.SearchFilter.FILTER_SONG).map { res ->
+                                res.copy(items = res.items.distinctBy { it.id })
+                            }
+                        }
                     }
                 }
                 searchResult.onSuccess { result ->
@@ -231,7 +275,14 @@ class ArchiveTuneExploreViewModel @Inject constructor(
                 }
                 result.onSuccess { continuationResult ->
                     _uiState.update { current ->
-                        val newItems = (current.searchResults + continuationResult.items).distinctBy { it.id }
+                        val filteredItems = when (current.activeCategory) {
+                            ArchiveTuneSearchCategory.PLAYLISTS -> continuationResult.items.filterIsInstance<PlaylistItem>()
+                            ArchiveTuneSearchCategory.SONGS -> continuationResult.items.filterIsInstance<SongItem>()
+                            ArchiveTuneSearchCategory.ALBUMS -> continuationResult.items.filterIsInstance<AlbumItem>()
+                            ArchiveTuneSearchCategory.ARTISTS -> continuationResult.items.filterIsInstance<ArtistItem>()
+                            ArchiveTuneSearchCategory.ALL -> continuationResult.items
+                        }
+                        val newItems = (current.searchResults + filteredItems).distinctBy { it.id }
                         current.copy(
                             searchResults = newItems,
                             searchContinuationToken = continuationResult.continuation,
