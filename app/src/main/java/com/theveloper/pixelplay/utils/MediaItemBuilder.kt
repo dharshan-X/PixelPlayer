@@ -99,15 +99,22 @@ object MediaItemBuilder {
     const val EXTERNAL_EXTRA_NAVIDROME_ID = EXTERNAL_EXTRA_PREFIX + "NAVIDROME_ID"
 
     fun build(song: Song): MediaItem {
+        val isRemote = !LocalArtworkUri.isLikelyLocalMedia(song.contentUriString) && song.path.startsWith("/") != true
         return MediaItem.Builder()
             .setMediaId(song.id)
             .setUri(playbackUri(song))
-            .setMimeType(playbackMimeType(song))
+            .apply {
+                if (isRemote) {
+                    setCustomCacheKey(song.id)
+                }
+                playbackMimeType(song)?.let { setMimeType(it) }
+            }
             .setMediaMetadata(buildMediaMetadataForSong(song))
             .build()
     }
 
     fun buildForExternalController(context: Context, song: Song): MediaItem {
+        val isRemote = !LocalArtworkUri.isLikelyLocalMedia(song.contentUriString) && song.path.startsWith("/") != true
         // This is the MediaSession item path for Android Auto / other external controllers;
         // time it so the performance report can attribute browse/queue lag here.
         return com.theveloper.pixelplay.data.diagnostics.PerformanceMetrics.time(
@@ -116,7 +123,12 @@ object MediaItemBuilder {
             MediaItem.Builder()
                 .setMediaId(song.id)
                 .setUri(playbackUri(song))
-                .setMimeType(playbackMimeType(song))
+                .apply {
+                    if (isRemote) {
+                        setCustomCacheKey(song.id)
+                    }
+                    playbackMimeType(song)?.let { setMimeType(it) }
+                }
                 .setMediaMetadata(
                     buildMediaMetadataForSong(
                         song = song,
@@ -175,7 +187,7 @@ object MediaItemBuilder {
         val isLikelyLocalMedia = LocalArtworkUri.isLikelyLocalMedia(contentUriString) ||
             filePath?.startsWith("/") == true
         if (!isLikelyLocalMedia) {
-            return baseMimeType
+            return null
         }
 
         val extension = filePath

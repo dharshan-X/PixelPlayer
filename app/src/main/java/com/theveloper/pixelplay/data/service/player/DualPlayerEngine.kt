@@ -1136,11 +1136,18 @@ class DualPlayerEngine @Inject constructor(
                 }
                 if (scheme in CLOUD_PROXY_SCHEMES || uriStr.startsWith("yt_")) {
                     val originalUri = uri.toString()
-                    val resolved = resolvedUriCache.get(originalUri) ?: runCatching {
-                        kotlinx.coroutines.runBlocking(Dispatchers.IO) {
-                            resolveCloudUri(uri)
-                        }
-                    }.getOrNull()
+                    val cleanId = uriStr.removePrefix("yt://").removePrefix("archivetune://").removePrefix("yt_").substringBefore('?')
+                    val specKey = spec.key
+                    val resolved = resolvedUriCache.get(originalUri)
+                        ?: specKey?.let { resolvedUriCache.get(it) }
+                        ?: resolvedUriCache.get("yt://$cleanId")
+                        ?: resolvedUriCache.get("yt_$cleanId")
+                        ?: resolvedUriCache.get(cleanId)
+                        ?: runCatching {
+                            kotlinx.coroutines.runBlocking(Dispatchers.IO) {
+                                resolveCloudUri(uri)
+                            }
+                        }.getOrNull()
 
                     if (resolved != null && resolved != uri) {
                         spec = spec.buildUpon().setUri(resolved).build()
