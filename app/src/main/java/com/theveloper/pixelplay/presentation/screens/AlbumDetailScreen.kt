@@ -158,7 +158,7 @@ fun AlbumDetailScreen(
                                 subtitle = "${album.artist} • ${formatSongCount(songs.size)} • ${formatTotalDuration(songs)}",
                                 artworkModel = album.albumArtUriString,
                                 songsForCollage = songs,
-                                badgeText = if (album.id.startsWith("yt_") || album.id.startsWith("archivetune_") || (album.albumArtUriString.contains("googleusercontent") || album.albumArtUriString.contains("ytimg"))) "YouTube Music" else null,
+                                badgeText = if (album.albumArtUriString?.let { it.contains("googleusercontent") || it.contains("ytimg") } == true) "YouTube Music" else null,
                                 onBackClick = { navController.popBackStack() },
                                 onPlayClick = {
                                     if (songs.isNotEmpty()) {
@@ -167,7 +167,12 @@ fun AlbumDetailScreen(
                                 },
                                 onShuffleClick = {
                                     if (songs.isNotEmpty()) {
-                                        playerViewModel.playSongsShuffled(songs, album.title, album.id, startAtZero = true)
+                                        playerViewModel.playSongsShuffled(
+                                            songsToPlay = songs,
+                                            queueName = album.title,
+                                            playlistId = album.id.toString(),
+                                            startAtZero = true
+                                        )
                                     }
                                 },
                                 onAddClick = {
