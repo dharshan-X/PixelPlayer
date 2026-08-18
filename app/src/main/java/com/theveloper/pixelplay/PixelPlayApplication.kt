@@ -148,6 +148,16 @@ class PixelPlayApplication : Application(), ImageLoaderFactory, Configuration.Pr
             runCatching {
                 moe.rukamori.archivetune.morideobfuscator.MoriCipherRuntime.refresh(force = false)
             }.onFailure { Timber.w(it, "MoriCipherRuntime background refresh failed") }
+            runCatching {
+                val visitorData = moe.rukamori.archivetune.innertube.YouTube.visitorData().getOrNull()
+                if (!visitorData.isNullOrBlank()) {
+                    moe.rukamori.archivetune.innertube.YouTube.visitorData = visitorData
+                    val sessionId = moe.rukamori.archivetune.innertube.YouTube.currentPlaybackAuthState().sessionId
+                    if (!sessionId.isNullOrBlank()) {
+                        moe.rukamori.archivetune.utils.potoken.BotGuardTokenGenerator.preWarm(sessionId)
+                    }
+                }
+            }.onFailure { Timber.w(it, "BotGuard PoToken / visitorData background bootstrap failed") }
         }
     }
 
