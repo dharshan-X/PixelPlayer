@@ -1455,18 +1455,37 @@ class MusicService : MediaLibraryService() {
         }
 
         override fun onPlayerError(error: PlaybackException) {
-            Timber.tag(TAG).e(error, "Error en el reproductor: ")
             val currentMediaItem = mediaSession?.player?.currentMediaItem
             val mediaId = currentMediaItem?.mediaId.orEmpty()
-            val isOnlineTrack = mediaId.startsWith("yt_") || mediaId.startsWith("yt://") || mediaId.startsWith("archivetune://")
+
+            val uriScheme = currentMediaItem?.localConfiguration?.uri?.scheme?.lowercase()
+            val contentUriString = currentMediaItem?.mediaMetadata?.extras?.getString(MediaItemBuilder.EXTERNAL_EXTRA_CONTENT_URI)
+            val contentUriScheme = contentUriString?.let { runCatching { Uri.parse(it).scheme?.lowercase() }.getOrNull() }
+
+            val onlineSchemes = setOf("http", "https", "telegram", "netease", "qqmusic", "navidrome", "jellyfin", "gdrive", "yt", "archivetune")
+            val isOnlineTrack = (uriScheme in onlineSchemes) ||
+                (contentUriScheme in onlineSchemes) ||
+                mediaId.startsWith("yt_") ||
+                mediaId.startsWith("yt://") ||
+                mediaId.startsWith("archivetune://")
+
+            val causeChain = dumpPlaybackExceptionCauseChain(error)
+            Timber.tag(TAG).e(
+                error,
+                "Playback error for mediaId=%s (errorCode=%d, errorCodeName=%s):\n%s",
+                mediaId,
+                error.errorCode,
+                error.errorCodeName,
+                causeChain
+            )
 
             fun notifyUserError() {
                 serviceScope.launch {
                     val trackTitle = currentMediaItem?.mediaMetadata?.title?.toString()
                         ?: currentMediaItem?.mediaId
                         ?: getString(R.string.common_unknown_track)
-                    val errorMessage = error.localizedMessage ?: error.message ?: "Unknown error"
-                    val toastMessage = getString(R.string.player_playback_error, "$trackTitle ($errorMessage)")
+                    val rootCauseMessage = getRootCauseMessage(error)
+                    val toastMessage = getString(R.string.player_playback_error, "$trackTitle ($rootCauseMessage)")
                     android.widget.Toast.makeText(this@MusicService, toastMessage, android.widget.Toast.LENGTH_LONG).show()
                 }
             }
@@ -1476,13 +1495,15 @@ class MusicService : MediaLibraryService() {
                     PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
                     PlaybackException.ERROR_CODE_IO_CLEARTEXT_NOT_PERMITTED,
                     PlaybackException.ERROR_CODE_IO_UNSPECIFIED,
-                    PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED
+                    PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED,
+                    PlaybackException.ERROR_CODE_UNSPECIFIED
                 ))
             ) {
                 Timber.tag(TAG).w("Attempting automatic stream recovery for online track: %s", mediaId)
                 serviceScope.launch(Dispatchers.Main.immediate) {
                     try {
                         val currentPos = mediaSession?.player?.currentPosition ?: 0L
+                        currentMediaItem?.localConfiguration?.uri?.toString()?.let { engine.invalidateStreamCache(it) }
                         engine.invalidateStreamCache(mediaId)
                         val newMediaItem = engine.resolveMediaItem(currentMediaItem!!)
                         val player = mediaSession?.player ?: engine.masterPlayer
@@ -2935,6 +2956,27 @@ class MusicService : MediaLibraryService() {
         if (restoreRepeatMode) {
             engine.masterPlayer.repeatMode = Player.REPEAT_MODE_OFF
         }
+    }
+
+    private fun dumpPlaybackExceptionCauseChain(error: PlaybackException): String {
+        val sb = StringBuilder()
+        var cause: Throwable? = error
+        var depth = 0
+        while (cause != null && depth < 10) {
+            if (depth > 0) sb.append("\nCaused by: ")
+            sb.append(cause.javaClass.name).append(": ").append(cause.message)
+            cause = cause.cause
+            depth++
+        }
+        return sb.toString()
+    }
+
+    private fun getRootCauseMessage(error: PlaybackException): String {
+        var rootCause: Throwable = error
+        while (rootCause.cause != null) {
+            rootCause = rootCause.cause!!
+        }
+        return rootCause.localizedMessage ?: rootCause.message ?: error.localizedMessage ?: error.message ?: "Unknown error"
     }
 
     /**
