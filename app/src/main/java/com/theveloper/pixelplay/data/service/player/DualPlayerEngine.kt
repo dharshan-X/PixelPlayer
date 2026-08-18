@@ -768,6 +768,7 @@ class DualPlayerEngine @Inject constructor(
 
     private val mediaOkHttpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
+            .proxy(moe.rukamori.archivetune.innertube.YouTube.streamOkHttpProxy)
             .addInterceptor(ArchiveTuneHeaderInterceptor())
             .followRedirects(true)
             .followSslRedirects(true)
@@ -1156,16 +1157,6 @@ class DualPlayerEngine @Inject constructor(
                     }
                 }
 
-                val targetUri = spec.uri
-                val urlStr = targetUri.toString()
-                if (urlStr.contains("videoplayback") || targetUri.getQueryParameter("c") != null) {
-                    val profile = moe.rukamori.archivetune.utils.StreamClientUtils.resolveRequestProfile(urlStr)
-                    val headers = HashMap(spec.httpRequestHeaders)
-                    headers["User-Agent"] = profile.userAgent
-                    profile.origin?.let { headers["Origin"] = it }
-                    profile.referer?.let { headers["Referer"] = it }
-                    spec = spec.buildUpon().setHttpRequestHeaders(headers).build()
-                }
                 return spec
             }
         }
