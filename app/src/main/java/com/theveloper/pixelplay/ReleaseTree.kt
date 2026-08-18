@@ -12,24 +12,31 @@ import timber.log.Timber
 class ReleaseTree : Timber.Tree() {
     
     override fun isLoggable(tag: String?, priority: Int): Boolean {
-        // Only log WARN and above in release builds
+        if (tag != null && (
+            tag.contains("YTPlayer", ignoreCase = true) ||
+            tag.contains("ArchiveTune", ignoreCase = true) ||
+            tag.contains("DualPlayer", ignoreCase = true) ||
+            tag.contains("MusicService", ignoreCase = true) ||
+            tag.contains("BotGuard", ignoreCase = true) ||
+            tag.contains("MoriCipher", ignoreCase = true) ||
+            tag.contains("StreamClient", ignoreCase = true) ||
+            tag.contains("ExoPlayer", ignoreCase = true)
+        )) {
+            return priority >= Log.DEBUG
+        }
         return priority >= Log.WARN
     }
     
     override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
-        // Skip if not loggable (redundant but explicit)
-        if (priority < Log.WARN) return
+        if (!isLoggable(tag, priority)) return
         
-        // Use Android's Log directly (stripped in release by R8 if configured)
         when (priority) {
+            Log.VERBOSE -> Log.v(tag, message, t)
+            Log.DEBUG -> Log.d(tag, message, t)
+            Log.INFO -> Log.i(tag, message, t)
             Log.WARN -> Log.w(tag, message, t)
             Log.ERROR -> Log.e(tag, message, t)
             Log.ASSERT -> Log.wtf(tag, message, t)
         }
-        
-        // TODO: Optionally report errors to crash analytics
-        // if (priority >= Log.ERROR && t != null) {
-        //     FirebaseCrashlytics.getInstance().recordException(t)
-        // }
     }
 }
