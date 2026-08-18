@@ -243,6 +243,7 @@ class DualPlayerEngine @Inject constructor(
         // Subset of REMOTE_MEDIA_SCHEMES: schemes that need proxy resolution.
         // http/https resolve directly and must NOT enter the resolvedUriCache lookup path.
         private val CLOUD_PROXY_SCHEMES = setOf("telegram", "netease", "qqmusic", "navidrome", "jellyfin", "gdrive", "yt", "archivetune")
+        private val SUPPORTED_PLAYBACK_SCHEMES = setOf("http", "https", "file", "content", "android.resource")
     }
 
     data class TransitionTarget(
@@ -1136,16 +1137,12 @@ class DualPlayerEngine @Inject constructor(
                 }
                 if (scheme in CLOUD_PROXY_SCHEMES || uriStr.startsWith("yt_")) {
                     val originalUri = uri.toString()
-                    val resolved = resolvedUriCache.get(originalUri) ?: runCatching {
-                        kotlinx.coroutines.runBlocking(Dispatchers.IO) {
-                            resolveCloudUri(uri)
-                        }
-                    }.getOrNull()
-
-                    if (resolved != null && resolved != uri) {
+                    val resolved = resolvedUriCache.get(originalUri)
+                    if (resolved != null && resolved.scheme?.lowercase() in SUPPORTED_PLAYBACK_SCHEMES) {
                         spec = spec.buildUpon().setUri(resolved).build()
                     } else {
-                        Timber.tag("DualPlayerEngine").d("resolveDataSpec: Cache MISS for %s — using original URI", scheme)
+                        Timber.tag("DualPlayerEngine").e("resolveDataSpec: Unresolved cloud URI %s (scheme=%s)", originalUri, scheme)
+                        throw java.io.IOException("Unresolved cloud source URI: $originalUri")
                     }
                 }
 
@@ -1249,26 +1246,46 @@ class DualPlayerEngine @Inject constructor(
 
     suspend fun resolveCloudUri(uri: Uri): Uri = withContext(Dispatchers.IO) {
         val uriString = uri.toString()
-        resolvedUriCache.get(uriString)?.let { return@withContext it }
-
-        val scheme = uri.scheme ?: if (uriString.startsWith("yt_") || (!uriString.contains("://") && !uriString.startsWith("/") && uriString.isNotBlank())) "yt" else null
-
-        val resolved: Uri? = when (scheme) {
-            "telegram" -> resolveTelegramUriAsync(uri, uriString)
-            "netease" -> resolveNeteaseUriAsync(uriString)
-            "qqmusic" -> resolveQqMusicUriAsync(uriString)
-            "navidrome" -> resolveNavidromeUriAsync(uriString)
-            "jellyfin" -> resolveJellyfinUriAsync(uriString)
-            "gdrive" -> resolveGDriveUriAsync(uriString)
-            "yt", "archivetune" -> resolveArchiveTuneUriAsync(uri, uriString)
-            else -> null
+        resolvedUriCache.get(uriString)?.let { cached ->
+            if (cached.scheme?.lowercase() in SUPPORTED_PLAYBACK_SCHEMES) {
+                return@withContext cached
+            }
         }
 
-        if (resolved != null) {
+        var scheme = uri.scheme
+        if (scheme == null && !uriString.startsWith("/") && uriString.isNotBlank()) {
+            scheme = "yt"
+        }
+        val isCloudSource = scheme in CLOUD_PROXY_SCHEMES || uriString.startsWith("yt_")
+
+        if (!isCloudSource) {
+            return@withContext uri
+        }
+
+        val resolved: Uri? = try {
+            kotlinx.coroutines.withTimeout(15_000L) {
+                when (scheme) {
+                    "telegram" -> resolveTelegramUriAsync(uri, uriString)
+                    "netease" -> resolveNeteaseUriAsync(uriString)
+                    "qqmusic" -> resolveQqMusicUriAsync(uriString)
+                    "navidrome" -> resolveNavidromeUriAsync(uriString)
+                    "jellyfin" -> resolveJellyfinUriAsync(uriString)
+                    "gdrive" -> resolveGDriveUriAsync(uriString)
+                    "yt", "archivetune" -> resolveArchiveTuneUriAsync(uri, uriString)
+                    else -> null
+                }
+            }
+        } catch (e: Exception) {
+            Timber.tag("DualPlayerEngine").e(e, "Timeout or error resolving cloud URI: %s", uriString)
+            null
+        }
+
+        if (resolved != null && resolved.scheme?.lowercase() in SUPPORTED_PLAYBACK_SCHEMES) {
             resolvedUriCache.put(uriString, resolved)
             return@withContext resolved
         }
-        uri
+
+        throw java.io.IOException("Unable to resolve cloud audio source: $uriString")
     }
 
     private suspend fun resolveArchiveTuneUriAsync(uri: Uri, uriString: String): Uri? = withContext(Dispatchers.IO) {

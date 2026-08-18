@@ -10,8 +10,8 @@ class ArchiveTuneRadioManagerTest {
     fun testSongDeduplication() {
         val existingIds = setOf("yt_song1", "yt_song2")
         val candidateItems = listOf(
-            SongItem(id = "song1", title = "Song 1", artists = listOf(Artist("A1", "id1"))),
-            SongItem(id = "song3", title = "Song 3", artists = listOf(Artist("A3", "id3")))
+            SongItem(id = "song1", title = "Song 1", artists = listOf(Artist("A1", "id1")), thumbnail = ""),
+            SongItem(id = "song3", title = "Song 3", artists = listOf(Artist("A3", "id3")), thumbnail = "")
         )
         val filtered = candidateItems.filter { "yt_${it.id}" !in existingIds }
         assertEquals(1, filtered.size)
