@@ -1246,6 +1246,10 @@ class MusicService : MediaLibraryService() {
         navidromePlaybackReportJob = null
     }
 
+    /** Tracks how many error-recovery attempts have been made for the current media item. */
+    private var streamRecoveryAttempts = 0
+    private var streamRecoveryMediaId: String? = null
+
     private val playerListener = object : Player.Listener {
         override fun onVolumeChanged(volume: Float) {
             replayGainProcessor.onPlayerVolumeChanged(volume)
@@ -1268,6 +1272,9 @@ class MusicService : MediaLibraryService() {
             syncLocalListeningStatsFromPlayer(player)
 
             if (isPlaying) {
+                // Playback started successfully — reset error recovery counter
+                streamRecoveryAttempts = 0
+                streamRecoveryMediaId = null
                 reportNavidromePlayback("playing")
                 startNavidromePlaybackReporting()
             } else {
@@ -1461,6 +1468,8 @@ class MusicService : MediaLibraryService() {
             val isOnlineTrack = mediaId.startsWith("yt_") || mediaId.startsWith("yt://") || mediaId.startsWith("archivetune://")
 
             fun notifyUserError() {
+                streamRecoveryAttempts = 0
+                streamRecoveryMediaId = null
                 serviceScope.launch {
                     val trackTitle = currentMediaItem?.mediaMetadata?.title?.toString()
                         ?: currentMediaItem?.mediaId
@@ -1476,14 +1485,35 @@ class MusicService : MediaLibraryService() {
                     PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
                     PlaybackException.ERROR_CODE_IO_CLEARTEXT_NOT_PERMITTED,
                     PlaybackException.ERROR_CODE_IO_UNSPECIFIED,
-                    PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED
+                    PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED,
+                    PlaybackException.ERROR_CODE_REMOTE_ERROR
                 ))
             ) {
-                Timber.tag(TAG).w("Attempting automatic stream recovery for online track: %s", mediaId)
+                // Track retry count per media item to prevent infinite recovery loops
+                if (streamRecoveryMediaId != mediaId) {
+                    streamRecoveryMediaId = mediaId
+                    streamRecoveryAttempts = 0
+                }
+                streamRecoveryAttempts++
+
+                if (streamRecoveryAttempts > 2) {
+                    Timber.tag(TAG).w("Max recovery attempts (%d) reached for %s, giving up", streamRecoveryAttempts, mediaId)
+                    notifyUserError()
+                    return
+                }
+
+                Timber.tag(TAG).w("Attempting automatic stream recovery (attempt %d) for online track: %s", streamRecoveryAttempts, mediaId)
                 serviceScope.launch(Dispatchers.Main.immediate) {
                     try {
                         val currentPos = mediaSession?.player?.currentPosition ?: 0L
                         engine.invalidateStreamCache(mediaId)
+                        // On second attempt, force-refresh PoTokens and visitor data
+                        if (streamRecoveryAttempts >= 2) {
+                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                val cleanId = mediaId.removePrefix("yt://").removePrefix("yt_").removePrefix("archivetune://")
+                                moe.rukamori.archivetune.utils.YTPlayerUtils.recoverFromBadStreamPlayerResponse(cleanId)
+                            }
+                        }
                         val newMediaItem = engine.resolveMediaItem(currentMediaItem!!)
                         val player = mediaSession?.player ?: engine.masterPlayer
                         val currentIndex = player.currentMediaItemIndex

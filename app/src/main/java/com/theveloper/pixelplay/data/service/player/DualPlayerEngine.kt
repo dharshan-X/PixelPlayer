@@ -786,7 +786,7 @@ class DualPlayerEngine @Inject constructor(
         resolvedUriCache.remove("yt://$cleanId")
         resolvedUriCache.remove("yt_$cleanId")
         resolvedUriCache.remove(cleanId)
-        moe.rukamori.archivetune.utils.YTPlayerUtils.markStreamClientFailed(cleanId, null, 403)
+        moe.rukamori.archivetune.utils.YTPlayerUtils.invalidateCachedStreamUrls(cleanId)
     }
 
     // Whether the OS classifies this as a low-RAM device. Used to cap the player's max
