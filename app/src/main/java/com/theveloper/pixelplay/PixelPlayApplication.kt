@@ -110,6 +110,13 @@ class PixelPlayApplication : Application(), ImageLoaderFactory, Configuration.Pr
         )
         moe.rukamori.archivetune.utils.potoken.BotGuardTokenGenerator.initialize(this)
 
+        val appLocale = java.util.Locale.getDefault()
+        moe.rukamori.archivetune.innertube.YouTube.locale =
+            moe.rukamori.archivetune.innertube.models.YouTubeLocale(
+                gl = appLocale.country.takeIf { it.isNotBlank() } ?: "US",
+                hl = appLocale.language.takeIf { it.isNotBlank() } ?: "en"
+            )
+
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
         } else {

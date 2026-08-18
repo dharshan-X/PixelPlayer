@@ -41,49 +41,60 @@ class ArchiveTuneStreamResolver @Inject constructor(
             )
         }
 
-        // YTPlayerUtils.playerResponseForPlayback already handles multi-client fallback
-        // internally (via buildStreamClientOrder), PoToken minting, bot-detection recovery,
-        // and login-context repair. Calling it once with the preferred client is sufficient.
-        val nativeResult = YTPlayerUtils.playerResponseForPlayback(
-            videoId = videoId,
-            playlistId = null,
-            audioQuality = quality,
-            connectivityManager = connectivityManager,
-            preferredStreamClient = PlayerStreamClient.WEB_REMIX
+        // Try clients in order: WEB_REMIX first, then fallback to mobile/embedded clients (IOS, ANDROID_MUSIC, ANDROID_VR, TVHTML5)
+        // which don't require web PoTokens if BotGuard generation is slow or blocked.
+        val clientCandidates = listOf(
+            PlayerStreamClient.WEB_REMIX,
+            PlayerStreamClient.IOS,
+            PlayerStreamClient.ANDROID_MUSIC,
+            PlayerStreamClient.ANDROID_VR,
+            PlayerStreamClient.TVHTML5
         )
 
-        if (nativeResult.isSuccess) {
-            val data = nativeResult.getOrThrow()
-            val requestProfile = StreamClientUtils.resolveRequestProfile(data.streamUrl)
-
-            Timber.tag("ArchiveTuneStreamResolver").d(
-                "Successfully resolved stream for %s using client %s (format=%s)",
-                videoId,
-                requestProfile.resolvedClientFamily,
-                data.format.mimeType
-            )
-
-            return@runCatching ArchiveTuneStreamResult(
+        var lastException: Throwable? = null
+        for (client in clientCandidates) {
+            val nativeResult = YTPlayerUtils.playerResponseForPlayback(
                 videoId = videoId,
-                streamUrl = data.streamUrl,
-                mimeType = data.format.mimeType.substringBefore(';').trim(),
-                bitrate = data.format.bitrate,
-                expiresInSeconds = data.streamExpiresInSeconds,
-                clientName = requestProfile.resolvedClientFamily,
-                userAgent = requestProfile.userAgent,
-                origin = requestProfile.origin,
-                referer = requestProfile.referer
+                playlistId = null,
+                audioQuality = quality,
+                connectivityManager = connectivityManager,
+                preferredStreamClient = client
             )
+
+            if (nativeResult.isSuccess) {
+                val data = nativeResult.getOrThrow()
+                val requestProfile = StreamClientUtils.resolveRequestProfile(data.streamUrl)
+
+                Timber.tag("ArchiveTuneStreamResolver").d(
+                    "Successfully resolved stream for %s using client %s (format=%s)",
+                    videoId,
+                    requestProfile.resolvedClientFamily,
+                    data.format.mimeType
+                )
+
+                return@runCatching ArchiveTuneStreamResult(
+                    videoId = videoId,
+                    streamUrl = data.streamUrl,
+                    mimeType = data.format.mimeType.substringBefore(';').trim(),
+                    bitrate = data.format.bitrate,
+                    expiresInSeconds = data.streamExpiresInSeconds,
+                    clientName = requestProfile.resolvedClientFamily,
+                    userAgent = requestProfile.userAgent,
+                    origin = requestProfile.origin,
+                    referer = requestProfile.referer
+                )
+            } else {
+                lastException = nativeResult.exceptionOrNull()
+                Timber.tag("ArchiveTuneStreamResolver").w(
+                    lastException,
+                    "Stream resolution failed with client=%s for videoId=%s",
+                    client,
+                    videoId
+                )
+            }
         }
 
-        // Native resolution failed — try KoiVerse extractor as fallback
-        val nativeException = nativeResult.exceptionOrNull()
-        Timber.tag("ArchiveTuneStreamResolver").w(
-            nativeException,
-            "Native stream resolution failed for videoId=%s, trying extractor fallback",
-            videoId
-        )
-
+        // Native resolution failed across all clients — try KoiVerse extractor as fallback if token configured
         if (mode == StreamBackendMode.AUTO_FALLBACK) {
             val token = tokenRepository.getToken()
             if (!token.isNullOrBlank()) {
@@ -103,6 +114,6 @@ class ArchiveTuneStreamResolver @Inject constructor(
             }
         }
 
-        throw nativeException ?: IllegalStateException("Failed to resolve stream for $videoId")
+        throw lastException ?: IllegalStateException("Failed to resolve stream for $videoId")
     }
 }
