@@ -201,8 +201,8 @@ fun AlbumDetailScreen(
                                     isCurrentSong = stablePlayerState.currentSong?.id == song.id,
                                     isPlaying = stablePlayerState.isPlaying,
                                     showAlbumArt = false,
-                                    onMoreOptionsClick = {
-                                        playerViewModel.selectSongForInfo(song)
+                                    onMoreOptionsClick = { clickedSong ->
+                                        playerViewModel.selectSongForInfo(clickedSong)
                                         showSongInfoBottomSheet = true
                                     },
                                     onClick = { playerViewModel.showAndPlaySong(song, songs) }

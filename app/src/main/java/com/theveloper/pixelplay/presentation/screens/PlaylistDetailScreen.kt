@@ -358,7 +358,7 @@ fun PlaylistDetailScreen(
                             },
                             onAddClick = if (isOnlinePlaylist) {
                                 {
-                                    playlistViewModel.importOnlinePlaylistToLibrary(currentPlaylist, songsInPlaylist) {
+                                    playlistViewModel.importOnlinePlaylistToLibrary(currentPlaylist, songsInPlaylist) { _ ->
                                         Toast.makeText(context, "Saved to your library", Toast.LENGTH_SHORT).show()
                                     }
                                 }
