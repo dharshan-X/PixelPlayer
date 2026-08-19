@@ -1355,13 +1355,23 @@ class DualPlayerEngine @Inject constructor(
     }
 
     suspend fun resolveMediaItem(mediaItem: MediaItem): MediaItem {
-        val uri = mediaItem.localConfiguration?.uri ?: return mediaItem
-        val scheme = uri.scheme
-        // Use CLOUD_PROXY_SCHEMES: http/https resolve directly via ExoPlayer and never
-        // reach resolveCloudUri, so checking them wastes an IO dispatch.
-        if (scheme !in CLOUD_PROXY_SCHEMES) return mediaItem
-        val resolvedUri = resolveCloudUri(uri)
-        return if (resolvedUri == uri) mediaItem else mediaItem.buildUpon().setUri(resolvedUri).build()
+        val originalUri = mediaItem.localConfiguration?.uri ?: return mediaItem
+        val scheme = originalUri.scheme
+        val uriStr = originalUri.toString()
+        val mediaId = mediaItem.mediaId
+
+        val targetUri: Uri = when {
+            scheme in CLOUD_PROXY_SCHEMES -> originalUri
+            uriStr.startsWith("yt_") || (!uriStr.contains("://") && !uriStr.startsWith("/")) -> Uri.parse("yt://${uriStr.removePrefix("yt_")}")
+            mediaId.startsWith("yt_") || mediaId.startsWith("yt://") || mediaId.startsWith("archivetune://") -> {
+                val cleanId = mediaId.removePrefix("yt://").removePrefix("yt_").removePrefix("archivetune://")
+                Uri.parse("yt://$cleanId")
+            }
+            else -> return mediaItem
+        }
+
+        val resolvedUri = resolveCloudUri(targetUri)
+        return if (resolvedUri == targetUri || resolvedUri == originalUri) mediaItem else mediaItem.buildUpon().setUri(resolvedUri).build()
     }
 
     suspend fun prepareNext(target: TransitionTarget, startPositionMs: Long = 0L) {
