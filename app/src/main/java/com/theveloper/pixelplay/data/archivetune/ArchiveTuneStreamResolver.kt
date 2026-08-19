@@ -41,14 +41,13 @@ class ArchiveTuneStreamResolver @Inject constructor(
             )
         }
 
-        // Try clients in order: WEB_REMIX first, then fallback to mobile/embedded clients (IOS, ANDROID_MUSIC, ANDROID_VR, TVHTML5)
-        // which don't require web PoTokens if BotGuard generation is slow or blocked.
+        // Try clients in order: IOS, ANDROID_VR, ANDROID_MUSIC, TVHTML5 first (immune to web poToken 403 CDN blocks), then WEB_REMIX.
         val clientCandidates = listOf(
-            PlayerStreamClient.WEB_REMIX,
             PlayerStreamClient.IOS,
-            PlayerStreamClient.ANDROID_MUSIC,
             PlayerStreamClient.ANDROID_VR,
-            PlayerStreamClient.TVHTML5
+            PlayerStreamClient.ANDROID_MUSIC,
+            PlayerStreamClient.TVHTML5,
+            PlayerStreamClient.WEB_REMIX
         )
 
         var lastException: Throwable? = null

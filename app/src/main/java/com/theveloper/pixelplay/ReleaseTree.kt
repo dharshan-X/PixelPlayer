@@ -12,19 +12,7 @@ import timber.log.Timber
 class ReleaseTree : Timber.Tree() {
     
     override fun isLoggable(tag: String?, priority: Int): Boolean {
-        if (tag != null && (
-            tag.contains("YTPlayer", ignoreCase = true) ||
-            tag.contains("ArchiveTune", ignoreCase = true) ||
-            tag.contains("DualPlayer", ignoreCase = true) ||
-            tag.contains("MusicService", ignoreCase = true) ||
-            tag.contains("BotGuard", ignoreCase = true) ||
-            tag.contains("MoriCipher", ignoreCase = true) ||
-            tag.contains("StreamClient", ignoreCase = true) ||
-            tag.contains("ExoPlayer", ignoreCase = true)
-        )) {
-            return priority >= Log.DEBUG
-        }
-        return priority >= Log.WARN
+        return priority >= Log.DEBUG
     }
     
     override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
