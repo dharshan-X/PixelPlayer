@@ -331,7 +331,7 @@ object YTPlayerUtils {
             poTokenPlayer = null,
         ).normalized()
 
-    internal fun shouldSkipCipheredWebPlaybackCandidate(
+    fun shouldSkipCipheredWebPlaybackCandidate(
         webClientPoTokenEnabled: Boolean,
         isWebClient: Boolean,
         isCiphered: Boolean,
@@ -342,7 +342,7 @@ object YTPlayerUtils {
             isCiphered &&
             !hasGvsPoToken
 
-    internal fun buildStreamCacheKey(
+    fun buildStreamCacheKey(
         videoId: String,
         itag: Int,
         client: YouTubeClient,
@@ -411,13 +411,13 @@ object YTPlayerUtils {
 
     private fun normalizeStreamClientKey(clientKey: String?): String = StreamClientUtils.normalizeClientKey(clientKey)
 
-    internal fun buildFailedClientKey(
+    fun buildFailedClientKey(
         videoId: String,
         clientKey: String,
         authFingerprint: String,
     ): String = "$authFingerprint:$videoId:${normalizeStreamClientKey(clientKey)}"
 
-    internal fun resolvePreferredPlaybackClient(
+    fun resolvePreferredPlaybackClient(
         preferredStreamClient: PlayerStreamClient,
         authState: PlaybackAuthState,
     ): YouTubeClient =
@@ -463,7 +463,7 @@ object YTPlayerUtils {
             }
         }
 
-    internal fun buildStreamClientOrder(
+    fun buildStreamClientOrder(
         preferredStreamClient: PlayerStreamClient,
         authState: PlaybackAuthState,
     ): List<YouTubeClient> {

@@ -122,9 +122,9 @@ object StreamClientUtils {
 
     fun isWebClient(requestProfile: StreamRequestProfile): Boolean = requestProfile.requiresPlaybackProbeRanges
 
-    internal fun buildClientKey(client: YouTubeClient): String = normalizeClientKey("${client.clientName}@${client.clientVersion}")
+    fun buildClientKey(client: YouTubeClient): String = normalizeClientKey("${client.clientName}@${client.clientVersion}")
 
-    internal fun normalizeClientKey(clientKey: String?): String =
+    fun normalizeClientKey(clientKey: String?): String =
         clientKey
             ?.trim()
             ?.takeIf { it.isNotBlank() }
